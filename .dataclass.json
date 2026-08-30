@@ -1,0 +1,24 @@
+{
+  "_comment": [
+    "Skill Repo Spec v1 s9 -- every path in this repo belongs to exactly one class.",
+    "TOOL    = code, SKILL.md, docs, reference data. Public.",
+    "FIXTURE = lifelike test data, produced only by tools/make_fixtures.py. A real record cannot be",
+    "          regenerated, so pasting a real chat row in fails at commit.",
+    "DATA    = anything a REAL RUN produced. Never git-tracked. Lives in the private companion",
+    "          config, resolved at runtime by tools/datadir.py. This repo ships only the schema.",
+    "data_sealed = a path that HELD real data, was purged, and must stay dead.",
+    "",
+    "Enforced by tools/data_boundary.py in .githooks and in CI."
+  ],
+  "_audited": "2026-08-30 FIRST AUDIT. The single highest-stakes output of this skill is a person's entire QQ chat history, verbatim, including one-on-one messages. The exporter writes decoded messages as JSON. Every landing directory the skill can write to is declared below and sealed, so that a real run cannot deposit chat history at a repo-relative path even with `git add -f`. All entries are directory-form and owe no .example: there is no single shape to publish for a whole export tree. The pulled encrypted database (qq_db_pull/) is equally real-run input and is sealed for the same reason.",
+  "data": [
+    "qq_db_pull/",
+    "qq_export/",
+    "qq_json/",
+    "qq_organized/"
+  ],
+  "data_sealed": [],
+  "fixture": [],
+  "_fixture_note": "No fixture file is committed. tools/make_fixtures.py builds a synthetic database into a temp directory at test time (see tools/test_qq.py), so there is no on-disk fixture that a real record could hide inside. The generator hardcodes only synthetic accounts and self-evidently fake text.",
+  "_data_home": "~/.qq-history-export-config/data/   (override with $QQ_HISTORY_EXPORT_DATA_DIR). If this skill records real-run output, it goes THERE -- never back into this repo."
+}

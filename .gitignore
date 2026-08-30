@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.pytest_cache/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*~
+
+# Local working notes / experiments
+scratch/
+*.local.md
+*.local.txt
+
+# Build/agent metadata & scratch artifacts (never part of the skill)
+PROGRESS.md
+.sie/
+scratchpad/
+*.log
+
+# Secrets / credentials (never commit)
+secrets/
+.env
+!.env.example
+*.key
+*.pem
+*.cred
+
+# NEVER commit real QQ data: the pulled encrypted database or any decoded output.
+# These are DATA (declared in .dataclass.json) and belong only in the private companion config.
+qq_db_pull/
+qq_export/
+qq_json/
+qq_organized/
+*.db
+*.db-shm
+*.db-wal
+# but the data-boundary manifest and plugin/skill metadata must stay tracked
+!.dataclass.json
+!.claude-plugin/plugin.json
+!skills/**/*.json
