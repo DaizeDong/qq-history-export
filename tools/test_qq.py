@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Round trip tests for the QQ decoder, on a synthetic database with no real data.
 
-The tests must be able to fail: the poison case decodes with a wrong key and asserts the coverage
-collapses, so a decoder that ignored its key would be caught here.
+The chosen mixed-language poison fixture must distinguish its two keys. Coverage is not a
+general key check; test_reliability.py also covers wrong keys with full ASCII UTF-8 coverage.
 """
 import os
 import sys

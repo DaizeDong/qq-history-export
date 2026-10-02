@@ -1,86 +1,111 @@
 #!/usr/bin/env python3
-"""Pull the classic mobile QQ message database off a rooted device or emulator over adb.
+"""Pull a stable classic QQ candidate with checked staging and bounded adb calls.
 
-The database is one plain SQLite file per logged in account at
-  /data/data/com.tencent.mobileqq/databases/<uin>.db
-This copies it to a local path outside the repo. It reads only; it changes nothing on the device.
-
-The owner account number is the database file name. If several accounts have logged in, this lists
-them and you pick one with --uin.
-
-Notes for emulators (learned on MEmu): `adb shell` is already root there, and wrapping commands in
-`su -c` can hang the shell, so this uses plain `adb shell`. On a real device that is not rooted this
-cannot reach the database at all, which is expected.
+Temporary device files are created and removed. The source database is never modified.
+Account ownership remains unverified until key recovery checks decoded account fields.
 """
 import argparse
-import os
+import json
+import re
+import shlex
 import subprocess
 import sys
+import uuid
 
-DB_DIR = "/data/data/com.tencent.mobileqq/databases"
+from qq_database import inspect_database, sha256
+from qq_storage import OutputCleanupError, atomic_output, private_path
+
+DB_DIR = '/data/data/com.tencent.mobileqq/databases'
 
 
 def adb(serial, *args):
-    cmd = ["adb"]
-    if serial:
-        cmd += ["-s", serial]
-    cmd += list(args)
-    return subprocess.run(cmd, capture_output=True, text=True)
+    argv = ['adb'] + (['-s', serial] if serial else []) + list(args)
+    try:
+        result = subprocess.run(argv, capture_output=True, text=True, encoding='utf-8',
+                                errors='replace', timeout=60)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise RuntimeError('adb '+str(args[0])+' unavailable or timed out') from exc
+    if result.returncode:
+        raise RuntimeError('adb '+str(args[0])+' failed (exit '+str(result.returncode)+')')
+    return result
 
 
 def list_account_dbs(serial):
-    r = adb(serial, "shell", "ls %s" % DB_DIR)
-    names = []
-    for line in r.stdout.replace("\r", "").split("\n"):
-        line = line.strip()
-        # account databases are named <digits>.db, not the many helper databases
-        if line.endswith(".db") and line[:-3].isdigit():
-            names.append(line[:-3])
-    return names
+    result = adb(serial, 'shell', 'ls '+shlex.quote(DB_DIR))
+    return sorted(set(line[:-3] for line in result.stdout.splitlines()
+                      if re.fullmatch(r'[0-9]{5,20}\.db', line)))
+
+
+def _source_hash(serial, source):
+    result = adb(serial, 'shell', 'sha256sum '+shlex.quote(source))
+    words = result.stdout.split()
+    if not words or not re.fullmatch(r'[a-fA-F0-9]{64}', words[0]):
+        raise RuntimeError('device did not return a valid snapshot hash')
+    return words[0].lower()
+
+
+def _no_live_journal(serial, source):
+    adb(serial, 'shell', 'test ! -s '+shlex.quote(source+'-wal')+' && test ! -s '+shlex.quote(source+'-journal'))
+
+
+def pull_database(serial, uin, output):
+    output = private_path(output)
+    if output.exists():
+        raise FileExistsError('output already exists; select a new candidate path')
+    accounts = list_account_dbs(serial)
+    uin = uin or (accounts[0] if len(accounts) == 1 else '')
+    if not uin or uin not in accounts:
+        raise ValueError('select one listed classic QQ account with --uin')
+    if adb(serial, 'shell', 'id -u').stdout.strip() != '0':
+        raise RuntimeError('adb shell is not root; this client requires existing root access')
+    source = DB_DIR+'/'+uin+'.db'
+    staging = '/data/local/tmp/qq-export-'+uuid.uuid4().hex+'.db'
+    _no_live_journal(serial, source)
+    before = _source_hash(serial, source)
+    with atomic_output(output) as temporary:
+        failure = None
+        try:
+            adb(serial, 'shell', 'umask 077; cp '+shlex.quote(source)+' '+shlex.quote(staging))
+            adb(serial, 'shell', 'chmod 600 '+shlex.quote(staging))
+            adb(serial, 'pull', staging, str(temporary))
+            _no_live_journal(serial, source)
+            if sha256(temporary) != before or _source_hash(serial, source) != before:
+                raise RuntimeError('source changed while copying; retry with a stable snapshot')
+            inspect_database(temporary)
+        except Exception as exc:
+            failure = exc
+        finally:
+            try:
+                adb(serial, 'shell', 'rm -f '+shlex.quote(staging))
+            except RuntimeError as cleanup_error:
+                detail = 'device staging cleanup failed at '+staging
+                if failure is not None:
+                    detail += '; previous stage failed: '+type(failure).__name__
+                raise RuntimeError(detail) from cleanup_error
+        if failure is not None:
+            raise failure
+        if output.exists() or private_path(output) != output:
+            raise RuntimeError('candidate destination changed; refusing overwrite')
+    return dict(status='pulled_candidate', selected_owner=uin, owner_verified=False,
+                ownership_evidence='source_filename_only', database_sha256=before, output=str(output))
 
 
 def main():
-    ap = argparse.ArgumentParser(description="pull the classic QQ database over adb")
-    ap.add_argument("--serial", default="", help="adb device serial (e.g. 127.0.0.1:21503)")
-    ap.add_argument("--uin", default="", help="account number to pull (default: the only one)")
-    ap.add_argument("--out", required=True, help="local output path (must be outside this repo)")
-    a = ap.parse_args()
-
-    repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    if os.path.abspath(a.out).startswith(repo):
-        sys.stderr.write("ERROR: refusing to pull the database into the repo. It is DATA; put it "
-                         "outside this repository.\n")
-        return 2
-
-    accounts = list_account_dbs(a.serial)
-    if not accounts:
-        sys.stderr.write("ERROR: no <uin>.db found under %s. Is the device rooted, is QQ installed, "
-                         "and has an account logged in?\n" % DB_DIR)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--serial', default='')
+    parser.add_argument('--uin', default='')
+    parser.add_argument('--out', required=True, help='new path inside the private companion data directory')
+    args = parser.parse_args()
+    try:
+        print(json.dumps(pull_database(args.serial, args.uin, args.out)))
+    except OutputCleanupError as exc:
+        print(json.dumps(exc.receipt), file=sys.stderr)
         return 1
-    uin = a.uin or (accounts[0] if len(accounts) == 1 else "")
-    if not uin:
-        sys.stderr.write("Several accounts are present, pick one with --uin:\n  %s\n"
-                         % "\n  ".join(accounts))
+    except (RuntimeError, OSError, ValueError) as exc:
+        print('Pull failed: '+str(exc), file=sys.stderr)
         return 1
-    if uin not in accounts:
-        sys.stderr.write("ERROR: account %s not among %s\n" % (uin, accounts))
-        return 1
-
-    src = "%s/%s.db" % (DB_DIR, uin)
-    # copy to a world readable spot first, then pull, then remove the copy
-    staging = "/sdcard/qq_pull_%s.db" % uin
-    adb(a.serial, "shell", "cp '%s' %s" % (src, staging))
-    adb(a.serial, "shell", "chmod 666 %s" % staging)
-    os.makedirs(os.path.dirname(os.path.abspath(a.out)) or ".", exist_ok=True)
-    r = adb(a.serial, "pull", staging, a.out)
-    adb(a.serial, "shell", "rm -f %s" % staging)
-    if not os.path.exists(a.out) or os.path.getsize(a.out) < 2048:
-        sys.stderr.write("ERROR: pull failed or file too small.\n%s\n" % r.stdout)
-        return 1
-    print("pulled account %s -> %s (%d bytes)" % (uin, a.out, os.path.getsize(a.out)))
-    print("owner uin: %s" % uin)
     return 0
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     sys.exit(main())

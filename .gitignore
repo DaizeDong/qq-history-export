@@ -43,6 +43,7 @@ qq_db_pull/
 qq_export/
 qq_json/
 qq_organized/
+qq_keys/
 *.db
 *.db-shm
 *.db-wal

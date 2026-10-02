@@ -1,7 +1,7 @@
 {
   "name": "qq-history-export",
   "version": "0.1.0",
-  "description": "Skill that exports the local chat history of the classic mobile QQ client (com.tencent.mobileqq, the pre-NT 8.x line) from a rooted Android device or emulator into organized JSON. The message database is a plain SQLite file whose per-message fields are XOR-obfuscated; short messages decode from a recovered global keystream offline, and full decoding of longer messages is done by attaching Frida to the running QQ process and calling the client's own decrypt path. Handles the classic mr_friend_<md5(uin)>_New / mr_troop_<md5(group)>_New table layout, the -1000 text message type, and the encrypted uin columns. Chat history is treated as private data: it never lands in the repo, only in a private companion config resolved at runtime.",
+  "description": "Exports supported text messages from a selected classic mobile QQ SQLite snapshot (com.tencent.mobileqq, the pre-NT 8.x line), obtained from a rooted Android device or emulator. Frida 16 observes Java-heap plaintext to recover a variable-period XOR field key and verify it against independent known messages. Short and long text messages are then decoded offline into JSONL. Export requires database-bound key/account evidence and 100% UTF-8 decoding coverage of selected supported text fields. This coverage does not establish whole-account completeness; real-device/client compatibility still requires validation. Databases, key/evidence bundles, and exports stay in a verified private companion repository.",
   "author": {
     "name": "DaizeDong"
   },

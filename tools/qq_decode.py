@@ -1,133 +1,102 @@
 #!/usr/bin/env python3
-"""Decode a classic mobile QQ message database into structured records.
-
-The database is a plain SQLite file. This module reads it, decodes the obfuscated message and
-account columns with a repeating XOR key, and returns one record per text message. It never writes
-back to the source and never contacts the network.
-
-The key is supplied by the caller. Recover it with tools/qq_keyfind.py against a running client, or
-pass a known key. See docs/REVERSE_ENGINEERING.md for why the key cannot be guessed reliably from
-the database alone.
-
-Record shape (one per msgtype -1000 message with text):
-  {"text", "is_me", "ctx": "dm"|"group", "ts", "sender", "conv", "uniseq"}
-"""
+"""Verify key/account evidence and atomically export classic QQ text messages."""
 import argparse
 import json
-import os
-import sqlite3
 import sys
 
+from qq_database import message_identity, open_database, sha256, standalone_snapshot, tables as _tables
+from qq_evidence import validate_evidence
 from qq_field_cipher import decode_field
+from qq_storage import OutputCleanupError, atomic_output, private_path, reject_input_alias
 
 TEXT_MSGTYPE = -1000
-
-
-def _tables(cur):
-    rows = cur.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
-    out = []
-    for (name,) in rows:
-        n = name.decode() if isinstance(name, bytes) else name
-        if n.startswith("mr_friend"):
-            out.append((n, "dm"))
-        elif n.startswith("mr_troop"):
-            out.append((n, "group"))
-    return out
 
 
 def _dec_text(blob, key):
     if not blob:
         return None
     try:
-        return decode_field(bytes(blob), key).decode("utf-8")
+        return decode_field(bytes(blob), key).decode('utf-8')
     except UnicodeDecodeError:
         return None
 
 
-def decode_db(db_path: str, key: bytes, owner_uin: str):
-    """Yield decoded records from a classic QQ database. Read only."""
-    db = sqlite3.connect(db_path)
-    db.text_factory = bytes
-    cur = db.cursor()
-    try:
-        for table, ctx in _tables(cur):
-            conv = "qq_" + table.split("_")[2][:12]
-            q = ("SELECT issend, msgData, senderuin, time, uniseq FROM '%s' "
-                 "WHERE msgtype=? AND msgData IS NOT NULL" % table)
-            for issend, md, su, ts, uniseq in cur.execute(q, (TEXT_MSGTYPE,)):
-                text = _dec_text(md, key)
-                if not text or not text.strip():
-                    continue
-                sender = _dec_text(su, key) if su else None
-                is_me = (issend == 2) or (sender == owner_uin)
-                yield {
-                    "text": text,
-                    "is_me": bool(is_me),
-                    "ctx": ctx,
-                    "ts": int(ts) if ts is not None else None,
-                    "sender": "qq_me" if is_me else ("qq_" + (sender or "unknown")),
-                    "conv": conv,
-                    "uniseq": str(uniseq),
-                }
-    finally:
-        db.close()
+def decode_db(db_path, key, owner_uin):
+    """Low-level read-only iterator; callers must establish key/account evidence."""
+    with open_database(db_path) as db:
+        for table, ctx in _tables(db.cursor()):
+            conv = 'qq_'+table.split('_')[2][:12]
+            query = ('SELECT issend,msgData,senderuin,time,uniseq FROM "'+table+'" '
+                     'WHERE msgtype=? AND msgData IS NOT NULL ORDER BY time,uniseq')
+            for sent, blob, sender_blob, timestamp, seq in db.execute(query, (TEXT_MSGTYPE,)):
+                text = _dec_text(blob, key)
+                if text is None:
+                    raise ValueError('text message failed UTF-8 decoding; refusing a partial export')
+                if type(timestamp) is not int or timestamp < 0:
+                    raise ValueError('message timestamp is invalid')
+                sender = _dec_text(sender_blob, key)
+                is_me = sent == 2 or sender == owner_uin
+                yield dict(text=text, is_me=bool(is_me), ctx=ctx, ts=timestamp,
+                           sender='qq_me' if is_me else 'qq_'+(sender or 'unknown'), conv=conv, uniseq=message_identity(seq))
 
 
-def decode_rate(db_path: str, key: bytes) -> float:
-    """Fraction of text messages that decode to valid UTF-8 with this key. A correct key gives a
-    rate at or near 1.0; a wrong key gives a rate near 0. Used to validate a recovered key."""
-    db = sqlite3.connect(db_path)
-    db.text_factory = bytes
-    cur = db.cursor()
-    total = ok = 0
-    try:
-        for table, _ in _tables(cur):
-            q = ("SELECT msgData FROM '%s' WHERE msgtype=? AND msgData IS NOT NULL" % table)
-            for (md,) in cur.execute(q, (TEXT_MSGTYPE,)):
-                if not md:
-                    continue
-                total += 1
-                try:
-                    decode_field(bytes(md), key).decode("utf-8")
-                    ok += 1
-                except UnicodeDecodeError:
-                    pass
-    finally:
-        db.close()
-    return ok / total if total else 0.0
+def decode_rate(db_path, key):
+    """UTF-8 decoding coverage only; an incorrect ASCII key can also score 1.0."""
+    total = valid = 0
+    with open_database(db_path) as db:
+        for table, _ in _tables(db.cursor()):
+            for (blob,) in db.execute('SELECT msgData FROM "'+table+'" WHERE msgtype=-1000 AND msgData IS NOT NULL'):
+                if blob:
+                    total += 1
+                    valid += _dec_text(blob, key) is not None
+    return valid/total if total else 0.0
+
+
+def export_database(db_path, bundle, output):
+    output = private_path(output)
+    reject_input_alias(output, [db_path], database=db_path)
+    count = mine = 0
+    with atomic_output(output) as temporary:
+        with standalone_snapshot(db_path) as snapshot:
+            before = sha256(snapshot)
+            key = validate_evidence(snapshot, bundle)
+            coverage = decode_rate(snapshot, key)
+            if coverage != 1.0:
+                raise ValueError('incomplete decoding coverage; existing export is preserved')
+            with temporary.open('w', encoding='utf-8', newline='\n') as stream:
+                for record in decode_db(snapshot, key, bundle['owner']):
+                    stream.write(json.dumps(record, ensure_ascii=False)+'\n')
+                    count += 1
+                    mine += record['is_me']
+            if not count:
+                raise ValueError('empty export')
+        if private_path(output) != output:
+            raise ValueError('output destination changed during export')
+    return dict(exported=count, owner_messages=mine, decoding_coverage=coverage,
+                owner_verified=True, key_evidence='known_plaintext_verified', database_sha256=before, output=str(output))
 
 
 def main():
-    ap = argparse.ArgumentParser(description="decode a classic QQ message database")
-    ap.add_argument("--db", required=True, help="path to the pulled <uin>.db")
-    ap.add_argument("--key", required=True, help="repeating XOR key (ascii)")
-    ap.add_argument("--owner", required=True, help="owner account number")
-    ap.add_argument("--out", required=True, help="output jsonl path (must be outside this repo)")
-    a = ap.parse_args()
-
-    repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    if os.path.abspath(a.out).startswith(repo):
-        sys.stderr.write("ERROR: refusing to write decoded chat history inside the repo. "
-                         "Decoded messages are DATA; write them outside this repository.\n")
-        return 2
-
-    key = a.key.encode()
-    rate = decode_rate(a.db, key)
-    if rate < 0.9:
-        sys.stderr.write("ERROR: only %.0f%% of messages decode with this key. The key is wrong "
-                         "or the database is not classic QQ.\n" % (rate * 100))
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--db', required=True)
+    parser.add_argument('--evidence', required=True, help='private recovery bundle from qq_keyfind.py')
+    parser.add_argument('--out', required=True, help='path inside the verified private companion data directory')
+    args = parser.parse_args()
+    try:
+        db = private_path(args.db)
+        evidence = private_path(args.evidence)
+        out = private_path(args.out)
+        reject_input_alias(out, [db, evidence], database=db)
+        bundle = json.loads(evidence.read_text(encoding='utf-8'))
+        print(json.dumps(export_database(db, bundle, out)))
+    except OutputCleanupError as exc:
+        print(json.dumps(exc.receipt), file=sys.stderr)
         return 1
-    os.makedirs(os.path.dirname(os.path.abspath(a.out)), exist_ok=True)
-    n = me = 0
-    with open(a.out, "w", encoding="utf-8") as f:
-        for rec in decode_db(a.db, key, a.owner):
-            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-            n += 1
-            me += 1 if rec["is_me"] else 0
-    print("decoded %d text messages (%d yours, %d others) at %.0f%% key coverage -> %s"
-          % (n, me, n - me, rate * 100, a.out))
+    except (RuntimeError, OSError, ValueError) as exc:
+        print('Decode failed: '+str(exc), file=sys.stderr)
+        return 1
     return 0
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     sys.exit(main())
