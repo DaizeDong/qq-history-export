@@ -8,7 +8,7 @@ the same key again.
 The one thing you must get right is the PERIOD. An earlier analysis mistook the first nine bytes of
 a fifteen byte key for the whole key, which decoded the first three Chinese characters of every
 message and then diverged. detect_period_from_known_plaintext recovers the true key from one known
-plaintext, ciphertext pair, so there is no guessing.
+plaintext, ciphertext pair. A separate independent pair must validate a recovered key.
 
 No real account data lives in this file. See tools/make_fixtures.py for how tests build a synthetic
 database that this module round trips.
@@ -35,6 +35,8 @@ def key_from_known_pair(cipher: bytes, plain: bytes, period: int) -> bytes:
     signal that the period guess is wrong.
     """
     n = min(len(cipher), len(plain))
+    if type(period) is not int or period < 1:
+        raise ValueError("period must be a positive integer")
     if n < period:
         raise ValueError("known pair shorter (%d) than period (%d)" % (n, period))
     key = bytearray(cipher[i] ^ plain[i] for i in range(period))
@@ -51,8 +53,10 @@ def detect_period_from_known_plaintext(cipher: bytes, plain: bytes, max_period: 
     Returns the recovered key (its length is the detected period). Raises if no period up to
     max_period explains the pair, which means the field is not a simple repeating XOR.
     """
-    n = min(len(cipher), len(plain))
-    for period in range(1, min(max_period, n) + 1):
+    if not cipher or len(cipher) != len(plain) or type(max_period) is not int or max_period < 1:
+        raise ValueError("a complete equal-length known pair and positive maximum period are required")
+    n = len(cipher)
+    for period in range(1, min(max_period, n // 2) + 1):
         try:
             key = key_from_known_pair(cipher, plain, period)
         except ValueError:
@@ -61,10 +65,7 @@ def detect_period_from_known_plaintext(cipher: bytes, plain: bytes, max_period: 
         # sample to cover at least two full periods so the round trip check has something to reject
         if n >= 2 * period:
             return key
-    # no period covered two full periods; fall back to the longest consistent key we can form
-    if n >= 1:
-        return bytes(cipher[i] ^ plain[i] for i in range(n))
-    raise ValueError("empty known pair")
+    raise ValueError("insufficient evidence: no repeating key spans two complete periods")
 
 
 if __name__ == "__main__":

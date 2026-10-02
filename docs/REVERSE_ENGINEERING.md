@@ -67,8 +67,9 @@ whose `uniseq` field holds the same message identity that keys the encrypted row
 recovery is: attach to the running client, walk the Java heap for `MessageFor*` instances, read
 their `msg` and `uniseq`, and for one message that is at least as long as the period, look up the
 encrypted `msgData` for that `uniseq` in the database. XOR the aligned plaintext and ciphertext and
-the repeating key falls straight out. One long message is enough, and a second one cross checks it:
-two independently recovered keys agree byte for byte. This is exactly what `tools/qq_keyfind.py`
+the repeating key falls straight out. The current implementation requires two distinct complete
+known messages, each spanning at least two periods. Both independently recovered keys must agree
+byte for byte, and all other aligned observations must match. This is what `tools/qq_keyfind.py`
 does. It does not call any decrypt routine inside the client; it only reads plaintext the client
 already decoded and lets the XOR give up the key.
 
@@ -76,13 +77,14 @@ After the key is recovered once, the whole database decodes offline with `tools/
 recovery reads the client's heap but never writes to it and never patches it.
 
 A note on frida versions: the heap read needs the frida Java bridge, and frida 17 removed that
-bridge from the injected agent, so `Java` is undefined there and the read cannot work. Use frida
-16.x on both sides. The MEmu device already shipped a `frida-server-16` binary for this reason.
+bridge from the bundled agent, so `Java` is undefined there and this implementation cannot use it.
+Use matching Frida 16.x installations on both sides; other agent integrations are unverified.
 
 ## What is data and what is not
 
 The pulled database and every decoded message are real run output. They are private data and never
-enter this repository, which is enforced by `.dataclass.json` and the repo relative write refusal in
-the tools. Tests run against a synthetic database produced by `tools/make_fixtures.py`, which
+enter this repository. The current tools resolve the pinned guard's data directory and verify
+the actual output repository is PRIVATE. The recovery bundle also contains private observations.
+Tests run against a synthetic database produced by `tools/make_fixtures.py`, which
 encrypts fake messages with a synthetic key so the round trip can be checked without touching any
 real account.
