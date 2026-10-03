@@ -55,7 +55,7 @@ class StorageProofTests(unittest.TestCase):
         for case in ('private', 'rewritten_private'):
             with self.subTest(case=case), self.storage(case) as (base, calls):
                 with patch.dict(os.environ, {'GIT_PREFIX': 'data/', 'GIT_INDEX_FILE': str(base/'copied-index')}):
-                    self.assertEqual(S.write_bundle('evidence.json', {'synthetic': True}), base/'evidence.json')
+                    self.assertEqual(S.write_bundle('evidence.json', {'synthetic': True}), base.resolve()/'evidence.json')
                 self.assertEqual(json.loads((base/'evidence.json').read_text()), {'synthetic': True})
                 self.assertFalse(any(argv[0] == 'ssh' for argv in calls))
 
