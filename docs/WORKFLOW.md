@@ -11,9 +11,10 @@ remotes. SSH URLs and aliases are currently unsupported because this consumer ha
 no admitted static SSH verifier; it never invokes SSH to inspect configuration.
 Git repository/configuration/transport overrides, HTTP routing configuration and
 proxy environment variables are rejected. Inert `GIT_PREFIX`, `GIT_INDEX_FILE` and
-`GIT_OPTIONAL_LOCKS` hints remain supported. Use a canonical HTTPS companion without
-these routing overrides. DATA paths, ancestors, locks and SQLite sidecars cannot be
-symlinks, reparse points or multiply linked files.
+`GIT_OPTIONAL_LOCKS` hints remain supported. Pager settings (`GIT_PAGER`, `GH_PAGER`,
+`PAGER`) are accepted and removed from captured subprocess environments.
+Use a canonical HTTPS companion without routing overrides. DATA paths, ancestors,
+locks and SQLite sidecars cannot be symlinks, reparse points or multiply linked files.
 
 Run from the canonical tool repository root. Commands use paths relative to the private data
 home. The account 10000 below is generated synthetic data, not an actual account.

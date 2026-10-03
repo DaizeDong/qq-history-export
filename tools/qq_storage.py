@@ -16,7 +16,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def _run(argv):
-    env = dict(os.environ)
+    env = {name: value for name, value in os.environ.items()
+           if name.upper() not in {'GIT_PAGER', 'GH_PAGER', 'PAGER'}}
     _check_environment(env)
     env.update(GIT_OPTIONAL_LOCKS='0', GIT_TERMINAL_PROMPT='0')
     try:
@@ -29,8 +30,8 @@ def _run(argv):
 
 
 def _check_environment(environment=None):
-    """Allow inert index/prefix hints; reject unproved repository or transport routing."""
-    inert_git = {'GIT_INDEX_FILE', 'GIT_PREFIX', 'GIT_OPTIONAL_LOCKS'}
+    """Allow inert hints; pagers are removed before captured subprocesses run."""
+    inert_git = {'GIT_INDEX_FILE', 'GIT_PREFIX', 'GIT_OPTIONAL_LOCKS', 'GIT_PAGER'}
     for name in (os.environ if environment is None else environment):
         upper = name.upper()
         if ((upper.startswith('GIT_') and upper not in inert_git)

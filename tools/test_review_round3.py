@@ -20,6 +20,8 @@ def companion(tmp_path, monkeypatch):
     calls = []
     device_calls = []
     monkeypatch.setattr(os, 'environ', {})
+    for key, value in F.storage_https_positive_environments()['pager'].items():
+        monkeypatch.setenv(key, value)
     monkeypatch.setenv('QQ_HISTORY_EXPORT_DATA_DIR', str(base))
     monkeypatch.setattr(S, 'ROOT', tool)
 
@@ -70,9 +72,10 @@ def test_trust_override_refuses_before_proof_device_or_creation(case, entrypoint
         assert main() == 1
         captured = capsys.readouterr()
         assert 'environment' in captured.err.lower()
+        assert case['name'] in captured.err
         assert not captured.out
     else:
-        with pytest.raises(RuntimeError, match='environment'):
+        with pytest.raises(RuntimeError, match=case['name']):
             if entrypoint == 'resolve':
                 S.private_path(output)
             elif entrypoint == 'bundle':
@@ -89,7 +92,7 @@ def test_proof_subprocess_rechecks_trust_environment(case, companion, monkeypatc
     _, calls, _ = companion
     S._check_environment()
     monkeypatch.setenv(case['name'], case['value'])
-    with pytest.raises(RuntimeError, match='environment'):
+    with pytest.raises(RuntimeError, match=case['name']):
         S._run(['gh', 'api', '--hostname', 'github.com',
                 'repos/example-owner/synthetic-private', '--jq', '.private'])
     assert calls == []
@@ -104,10 +107,12 @@ def test_default_and_inert_authenticated_environment_remain_supported(name, envi
     assert json.loads(output.read_text(encoding='utf-8')) == {'synthetic': True}
     proof_calls = [row for row in calls if row['argv'][0] == 'gh']
     assert len(proof_calls) == 2
-    for row in proof_calls:
+    for row in calls:
         assert all(row['environment'][key] == value for key, value in environment.items()
-                   if key != 'GIT_OPTIONAL_LOCKS')
+                   if key not in {'GIT_OPTIONAL_LOCKS', 'GIT_PAGER', 'GH_PAGER', 'PAGER'})
+        assert not {'GIT_PAGER', 'GH_PAGER', 'PAGER'} & row['environment'].keys()
         assert row['environment']['GIT_OPTIONAL_LOCKS'] == '0'
         assert row['environment']['GIT_TERMINAL_PROMPT'] == '0'
+    assert all(os.environ[key] == value for key, value in environment.items())
     assert device_calls == []
     assert not list(base.rglob('*.lock')) and not list(base.rglob('*.partial'))
