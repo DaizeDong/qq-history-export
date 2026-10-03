@@ -227,6 +227,10 @@ def storage_https_positive_environments():
         'default': {},
         'auth_and_inert': {'GH_TOKEN': 'synthetic-auth-token', 'GIT_PREFIX': 'data/',
                           'GIT_INDEX_FILE': 'synthetic-index', 'NO_PROXY': 'localhost'},
+        'pager': {'GIT_PAGER': 'cat'},
+        'pager_commands': {'GIT_PAGER': 'synthetic-unavailable-pager',
+                           'GH_PAGER': 'synthetic-unavailable-pager',
+                           'PAGER': 'synthetic-unavailable-pager'},
     }
 
 def main():
