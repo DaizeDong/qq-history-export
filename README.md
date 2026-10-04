@@ -9,11 +9,21 @@ Export your classic mobile QQ text history with a verified database snapshot, in
 
 [English](README.md) | [中文版](README_CN.md)
 
-## ⭐ Read this first, the design philosophy
+## Design Philosophy
 
-A readable SQLite file is not proof that its message fields decode correctly. Short XOR keys can produce valid UTF-8 that is still wrong. This tool requires two distinct known plaintext messages spanning complete key periods, then checks the decoded owner and sender fields. UTF-8 rate is reported separately as decoding coverage.
+A readable SQLite file does not establish that its message fields decode correctly. Short XOR
+keys can produce valid UTF-8 that is still wrong. This exporter therefore requires independent
+known plaintext messages, binds the recovered key to a frozen database snapshot, and verifies
+the decoded account fields before replacing an archive. Decoding coverage remains a separate measurement.
 
-The source database, recovery bundle and decoded messages are private runtime data. They belong in a separate PRIVATE versioned companion. Every writing CLI verifies that boundary before acting. A failed transfer or decode preserves the previous archive.
+This choice requires observation of a supported running client and refuses exports when the
+evidence is incomplete. It preserves the previous archive when transfer or validation fails.
+Databases, recovery evidence and decoded messages stay in a verified PRIVATE versioned companion,
+so an export can be retained and compared without placing chat history in the public tool.
+Synthetic checks establish the local contracts; device compatibility and whole-account completeness
+still need their own evidence.
+
+[Read the full design philosophy](PHILOSOPHY.md).
 
 ## Scope and requirements
 
