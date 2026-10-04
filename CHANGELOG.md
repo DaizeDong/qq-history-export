@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here (Keep a Changelog style).
 
+## [Unreleased]
+
+### Changed
+- Require database-bound key and account evidence for export, with independent known plaintext observations and variable-period XOR recovery.
+- Freeze the database snapshot used for validation and export; reject journal activity, invalid identities and incomplete selected-text decoding before replacement.
+- Verify a PRIVATE versioned destination before writing databases, recovery evidence or JSONL output.
+- Return distinct cleanup-required receipts when replacement has already committed, so callers can inspect before retrying.
+- Clarify the recovery tradeoffs and the separate scope of synthetic checks and real-device acceptance.
+
+### Fixed
+- Accept pager settings while isolating Git and GitHub subprocess environments used for private storage verification.
+
 ## [0.1.0] - 2026-08-30
 
 ### Added
