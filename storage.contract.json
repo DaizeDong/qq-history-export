@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "tool": "qq-history-export",
+  "artifacts": [
+    {
+      "artifact_id": "database_candidates",
+      "path_pattern": "data/qq_db_pull/*.db",
+      "purpose": "Stable classic QQ database candidates used for verified recovery and export.",
+      "schema": "tools/qq_database.py: open_database, inspect_database and standalone_snapshot; docs/REVERSE_ENGINEERING.md",
+      "producer": "tools/qq_pull.py",
+      "consumer_or_final_deliverable": "tools/qq_keyfind.py and tools/qq_decode.py",
+      "rebuild_or_restore": "Restore the exact private database bytes; a new device pull is a new candidate and needs new evidence.",
+      "retention_rule": {
+        "class": "core",
+        "rule": "Keep candidates required by active recovery or a selected export whose verification or rebuild is still required. Release rejected or superseded candidates only after those dependencies end."
+      }
+    },
+    {
+      "artifact_id": "recovery_evidence",
+      "path_pattern": "data/qq_keys/*.json",
+      "purpose": "Private recovered key and account evidence bound to one database hash.",
+      "schema": "tools/qq_evidence.py: validate_evidence, schema_version 1",
+      "producer": "tools/qq_keyfind.py",
+      "consumer_or_final_deliverable": "tools/qq_decode.py validates the evidence before export.",
+      "rebuild_or_restore": "Restore the exact bundle with its matching database; recollection requires the authorized running client.",
+      "retention_rule": {
+        "class": "core",
+        "rule": "Keep only bundles supporting active recovery or selected exports with a continuing verification or rebuild requirement; retire them together with the corresponding ended dependency."
+      }
+    },
+    {
+      "artifact_id": "selected_exports",
+      "path_pattern": "data/qq_json/*.jsonl",
+      "purpose": "Verified supported text messages selected for the user's export deliverable.",
+      "schema": "tools/qq_decode.py: decode_db records and export_database validation",
+      "producer": "tools/qq_decode.py",
+      "consumer_or_final_deliverable": "The selected private JSONL export and explicitly authorized downstream consumers.",
+      "rebuild_or_restore": "Restore from private version control or rerun export with the matching database and validated evidence.",
+      "retention_rule": {
+        "class": "core",
+        "rule": "Keep the selected final export while requested or referenced. Remove superseded duplicates after acceptance confirms the selected replacement preserves the required messages."
+      }
+    },
+    {
+      "artifact_id": "frozen_working_copies",
+      "path_pattern": "data/qq_db_pull/.qq-snapshot-*/**",
+      "purpose": "Temporary immutable database copies for one recovery or decode transaction.",
+      "schema": "tools/qq_database.py: standalone_snapshot",
+      "producer": "tools/qq_database.py",
+      "consumer_or_final_deliverable": "The active recovery or decode transaction only.",
+      "rebuild_or_restore": "Recreate from the retained stable database after confirming no transaction is using the previous copy.",
+      "retention_rule": {
+        "class": "rebuildable",
+        "rule": "Normal context cleanup removes these copies. After a crash, remove only after the writer has stopped and the final output and source remain intact."
+      }
+    },
+    {
+      "artifact_id": "incomplete_outputs",
+      "path_pattern": "data/**/.*.partial",
+      "purpose": "Private staging bytes before an atomic output replacement.",
+      "schema": "tools/qq_storage.py: atomic_output and OutputCleanupError",
+      "producer": "tools/qq_storage.py",
+      "consumer_or_final_deliverable": "The active output transaction and explicit cleanup recovery.",
+      "rebuild_or_restore": "Retry the verified stage from retained inputs after establishing whether the previous transaction committed.",
+      "retention_rule": {
+        "class": "rebuildable",
+        "rule": "Remove after successful replacement and cleanup, or after an inactive failed transaction is reconciled; never remove an active writer's staging file."
+      }
+    },
+    {
+      "artifact_id": "transaction_locks",
+      "path_pattern": "data/**/*.lock",
+      "purpose": "Exclusive-writer state and interrupted transaction recovery markers.",
+      "schema": "tools/qq_storage.py: atomic_output and OutputCleanupError",
+      "producer": "tools/qq_storage.py",
+      "consumer_or_final_deliverable": "Concurrent writers and operator recovery of an interrupted output transaction.",
+      "rebuild_or_restore": "Do not recreate or clear blindly; inspect the commit-boundary receipt and final output first.",
+      "retention_rule": {
+        "class": "core",
+        "rule": "Keep while the writer is active or commit status is unresolved. Only the completing writer or a separately reviewed recovery may remove the lock."
+      }
+    }
+  ],
+  "protected_paths": ["data/**/*.lock", "data/**/*-wal", "data/**/*-shm", "data/**/*-journal"]
+}
