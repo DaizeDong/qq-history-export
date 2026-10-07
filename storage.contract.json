@@ -1,6 +1,7 @@
 {
   "schema_version": 1,
   "tool": "qq-history-export",
+  "max_bytes": 67108864,
   "artifacts": [
     {
       "artifact_id": "database_candidates",
