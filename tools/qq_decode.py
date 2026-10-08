@@ -53,7 +53,7 @@ def decode_rate(db_path, key):
 
 
 def export_database(db_path, bundle, output):
-    output = private_path(output)
+    output = private_path(output, artifact_id='selected_exports')
     reject_input_alias(output, [db_path], database=db_path)
     count = mine = 0
     with atomic_output(output) as temporary:
@@ -70,7 +70,7 @@ def export_database(db_path, bundle, output):
                     mine += record['is_me']
             if not count:
                 raise ValueError('empty export')
-        if private_path(output) != output:
+        if private_path(output, artifact_id='selected_exports') != output:
             raise ValueError('output destination changed during export')
     return dict(exported=count, owner_messages=mine, decoding_coverage=coverage,
                 owner_verified=True, key_evidence='known_plaintext_verified', database_sha256=before, output=str(output))
@@ -85,7 +85,7 @@ def main():
     try:
         db = private_path(args.db)
         evidence = private_path(args.evidence)
-        out = private_path(args.out)
+        out = private_path(args.out, artifact_id='selected_exports')
         reject_input_alias(out, [db, evidence], database=db)
         bundle = json.loads(evidence.read_text(encoding='utf-8'))
         print(json.dumps(export_database(db, bundle, out)))

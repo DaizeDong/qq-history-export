@@ -142,7 +142,44 @@ def build_storage_fixture(root):
     resolver = tool/'guards/tools/datadir.py'
     resolver.parent.mkdir(parents=True)
     resolver.write_text('from pathlib import Path\ndef resolve_data_dir(name):\n    return Path('+repr(str(base))+')\n', encoding='utf-8')
+    admission = tool/'guards/tools/storage_contract.py'
+    admission.write_text('from types import SimpleNamespace\nfrom pathlib import Path\ndef authorize_artifact_write(source, root, relative, **kwargs):\n    return SimpleNamespace(path=Path(root)/relative)\n', encoding='utf-8')
     return tool, repo, base
+
+
+def build_versioned_storage(root):
+    """Create an isolated synthetic Git companion and fresh local visibility receipt."""
+    from datetime import datetime, timezone
+    import json
+    import subprocess
+    root = Path(root)
+    repo, home = root/'companion', root/'home'
+    home.mkdir()
+    environment = {key: value for key, value in os.environ.items()
+                   if key.upper() in {'PATH', 'SYSTEMROOT', 'WINDIR', 'TEMP', 'TMP'}}
+    environment.update(HOME=str(home), USERPROFILE=str(home))
+    setup = dict(environment, GIT_AUTHOR_NAME='Synthetic User', GIT_AUTHOR_EMAIL='user1@example.com',
+                 GIT_COMMITTER_NAME='Synthetic User', GIT_COMMITTER_EMAIL='user1@example.com')
+    def git(*args, input=None):
+        result = subprocess.run(['git', *args], cwd=repo if repo.exists() else root,
+                                env=setup, input=input, capture_output=True, text=True)
+        if result.returncode:
+            raise AssertionError('Synthetic Git setup failed: '+str(args))
+        return result.stdout.strip()
+    git('init', '--template=', str(repo))
+    identity = 'example/qq-history-export-config'
+    git('config', 'remote.origin.url', 'https://github.com/'+identity+'.git')
+    tree = git('hash-object', '-t', 'tree', '-w', '--stdin', input='')
+    commit = git('commit-tree', tree, '-m', 'Synthetic empty companion')
+    git('update-ref', 'HEAD', commit)
+    receipt = home/'.pii-guard/visibility.json'
+    receipt.parent.mkdir()
+    receipt.write_text(json.dumps({'_refreshed': datetime.now(timezone.utc).isoformat(),
+                                  identity: 'PRIVATE'}), encoding='utf-8')
+    data = repo/'data'
+    data.mkdir()
+    environment['QQ_HISTORY_EXPORT_DATA_DIR'] = str(data)
+    return repo, data, environment
 
 
 def storage_environment_cases():

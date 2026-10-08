@@ -120,7 +120,8 @@ class TextPreservationTests(unittest.TestCase):
             bundle = K.evidence_from_pairs(db, case['pairs'], F.OWNER)
             evidence.write_text(json.dumps(bundle), encoding='utf-8')
             stdout = io.StringIO()
-            with patch.object(D, 'private_path', lambda value: Path(value)), patch.object(sys, 'argv', [
+            with patch.object(D, 'private_path', lambda value, **kwargs: Path(value)), patch.object(
+                    S, 'private_path', lambda value, **kwargs: Path(value)), patch.object(sys, 'argv', [
                     'qq_decode.py', '--db', str(db), '--evidence', str(evidence), '--out', str(output)]), contextlib.redirect_stdout(stdout):
                 self.assertEqual(D.main(), 0)
             rows = [json.loads(line) for line in output.read_text(encoding='utf-8').splitlines()]
@@ -143,7 +144,7 @@ class TextPreservationTests(unittest.TestCase):
                     bundle = K.evidence_from_pairs(db, case['pairs'], F.OWNER)
                 evidence.write_text(json.dumps(bundle), encoding='utf-8')
                 output.write_bytes(b'previous synthetic archive\n')
-                with patch.object(D, 'private_path', lambda value: Path(value)), patch.object(sys, 'argv', [
+                with patch.object(D, 'private_path', lambda value, **kwargs: Path(value)), patch.object(sys, 'argv', [
                         'qq_decode.py', '--db', str(db), '--evidence', str(evidence), '--out', str(output)]), contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(io.StringIO()):
                     self.assertEqual(D.main(), 1)
                 self.assertEqual(output.read_bytes(), b'previous synthetic archive\n')

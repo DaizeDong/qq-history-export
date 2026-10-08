@@ -23,7 +23,9 @@ Load `../../docs/WORKFLOW.md` for exact commands and failure recovery. Load
 
 - Runtime databases, keys, known plaintext and output are DATA in a verified PRIVATE versioned
   companion. Set `QQ_HISTORY_EXPORT_CONFIG` or `QQ_HISTORY_EXPORT_DATA_DIR`. The CLI rejects
-  unknown/public/unversioned destinations and has no tool-repository fallback.
+  unknown/public/unversioned destinations and has no tool-repository fallback. CONFIG requires
+  an existing `data/` child. DATA_DIR must select that exact child; see [storage discovery](../../DATA.md)
+  for precedence, CONFIG_DIR and switching. Uninitialized storage stops before device access.
 - Use only an already rooted device with the classic client. Do not install root, patch QQ,
   spawn through Frida or stop applications as part of diagnosis.
 - The bundled heap agent requires the Frida 16.x Java bridge on both sides. A missing bridge
@@ -68,3 +70,5 @@ review. Do not claim whole-account completeness or universal device compatibilit
 Run `python -m pytest tools -q` and `python tools/test_qq.py` from the canonical repository root.
 Fixtures come from `tools/make_fixtures.py`; device/Frida regression calls are intercepted.
 Synthetic passing tests do not constitute a live-device export.
+
+Before output creation, the writer checks the final artifact and its exact lock/partial transaction paths through source ownership and PRIVATE admission. Ignored versioned transaction files refuse the operation. Preserve any explicit cleanup receipt for unresolved transactions.
