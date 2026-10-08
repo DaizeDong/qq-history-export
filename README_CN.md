@@ -44,7 +44,11 @@ git clone --recurse-submodules https://github.com/DaizeDong/qq-history-export.gi
 将 `QQ_HISTORY_EXPORT_CONFIG` 指向单独克隆的 PRIVATE 伴生仓，先创建其中的 `data/` 目录。
 也可用 `QQ_HISTORY_EXPORT_DATA_DIR` 直接指定该数据目录。路径由固定版本的 guard 解析，
 Git 和 `gh` 验证实际目标仓。公开、未知可见性、未纳入版本管理的目录均拒绝写入。
-真实记录在私有伴生仓提交，凭据仍留在 Git 之外。
+真实记录在私有伴生仓提交。发现顺序为 `QQ_HISTORY_EXPORT_DATA_DIR`、
+`QQ_HISTORY_EXPORT_CONFIG`、`QQ_HISTORY_EXPORT_CONFIG_DIR`，随后按
+[共享发现规则](guards/COMPANION.md)检查已确认的同级伴生仓和主目录默认位置。
+切换 CONFIG 前须清除继承的 DATA_DIR。所有选择都必须落到伴生仓的 `data/`；
+缺少该子目录时保持未初始化，在设备访问或输出创建前报错，无需建立设置注册表。
 
 ## 快速开始
 
@@ -98,3 +102,12 @@ python tools/test_qq.py
 ## 路线图和许可
 
 [ROADMAP.md](ROADMAP.md) · [CHANGELOG.md](CHANGELOG.md) · [MIT](LICENSE)。
+
+最终输出还需通过[共享写入检查](guards/COMPANION.md)：本地可见性记录须有效，伴生仓须已有提交，
+文件须属于对应的数据类型且未被 Git 忽略。数据库、密钥证据和 JSONL 各自核对类型，
+在设备操作前及最终替换前检查；只读输入不套用输出类型。
+
+支持 Git 的标准 TLS 后端；Git for Windows 自带的 CA 文件须经共享 Guards 核实。
+自定义 CA 文件和关闭证书验证的设置仍被拒绝，具体规则见[工作流](docs/WORKFLOW.md)。
+
+写入前会检查最终输出、锁文件和临时文件的产物声明及私有仓准入条件。这些事务文件按声明纳入版本管理；若 Git 忽略它们，操作会在创建文件前失败。无法清理的事务会留下明确的处理提示。

@@ -4,6 +4,9 @@ All notable changes to this project are documented here (Keep a Changelog style)
 
 ## [Unreleased]
 
+- Bind concrete runtime writer destinations and transaction files to canonical source artifact admission before creation. Offline regression controls preserve PRIVATE, retention, topology and versioning refusals.
+
+
 ### Storage review threshold
 - Set a 64 MiB companion working-data review threshold. Required observations and
   recovery state stay protected when the threshold is exceeded.
@@ -16,6 +19,8 @@ All notable changes to this project are documented here (Keep a Changelog style)
 - Clarify the recovery tradeoffs and the separate scope of synthetic checks and real-device acceptance.
 
 ### Fixed
+- Accept standard Git TLS backends and use canonical Guards proof for the selected Git installation's bundled CA, while rejecting custom trust overrides.
+- Reject selected companions without data/ and alternate DATA roots before device access. Bind final output paths to their source artifact and shared PRIVATE, versioned write admission; document storage-only discovery and switching.
 - Accept pager settings while isolating Git and GitHub subprocess environments used for private storage verification.
 
 ## [0.1.0] - 2026-08-30

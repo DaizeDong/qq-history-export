@@ -7,7 +7,7 @@ from pathlib import Path
 import re
 import stat
 import subprocess
-import tempfile
+import uuid
 from urllib.parse import urlsplit
 
 from qq_database import SIDECARS
@@ -68,6 +68,7 @@ def _check_data_aliases(path):
 def _configuration(directory):
     raw = _run(['git', '-C', str(directory), 'config', '--includes', '--null', '--list'])
     entries = []
+    requires_default_trust_proof = False
     for record in raw.split('\0'):
         if not record:
             continue
@@ -76,12 +77,25 @@ def _configuration(directory):
             raise RuntimeError('Cannot parse private-storage Git configuration')
         key = key.lower()
         field = key.rsplit('.', 1)[-1]
+        standard_tls_backend = key == 'http.sslbackend' and value.strip().lower() in {'openssl', 'schannel'}
+        bundled_ca_candidate = key == 'http.sslcainfo'
         if (key in {'core.worktree', 'core.sshcommand', 'core.gitproxy', 'ssh.variant'}
-                or key.startswith('http.')
+                or key.startswith('http.') and not (standard_tls_backend or bundled_ca_candidate)
                 or key.startswith('remote.') and (field in {'uploadpack', 'receivepack', 'vcs'}
                                                    or field.startswith('proxy'))):
             raise RuntimeError('Unsupported private-storage Git routing configuration: '+key)
         entries.append((key, value))
+        requires_default_trust_proof |= bundled_ca_candidate
+    if requires_default_trust_proof:
+        # Only Guards can establish that this is the selected Git installation's own CA bundle.
+        module_path = ROOT/'guards/tools/data_boundary.py'
+        _physical_path(module_path)
+        if not module_path.is_file():
+            raise RuntimeError('Missing guards default TLS trust proof; initialize pinned submodules')
+        spec = importlib.util.spec_from_file_location('qq_guard_tls_boundary', module_path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        module.prove_private_companion(directory)
     return entries
 
 
@@ -119,13 +133,16 @@ def _prove_publication(repo, configuration):
             raise RuntimeError('Companion publication destination is PUBLIC or visibility is unknown')
 
 
-def private_path(requested):
+def private_path(requested, *, artifact_id=None):
+    """Resolve reads; output callers additionally bind the exact source artifact owner."""
     _check_environment()
     for selector in ('QQ_HISTORY_EXPORT_DATA_DIR', 'QQ_HISTORY_EXPORT_CONFIG', 'QQ_HISTORY_EXPORT_CONFIG_DIR'):
         value = os.environ.get(selector)
         if value:
             if not _physical_path(value).is_dir():
                 raise RuntimeError('Explicit private storage selector does not exist: '+selector)
+            if selector != 'QQ_HISTORY_EXPORT_DATA_DIR' and not _physical_path(Path(value)/'data').is_dir():
+                raise RuntimeError('Uninitialized: selected companion requires its declared data/ directory')
             break
     module_path = ROOT/'guards/tools/datadir.py'
     _physical_path(module_path)
@@ -142,7 +159,8 @@ def private_path(requested):
         raise RuntimeError('Resolved private data directory does not exist')
     path = Path(requested).expanduser()
     path = path if path.is_absolute() else base/path
-    path = _physical_path(path).resolve()
+    lexical = _physical_path(path)
+    path = lexical.resolve()
     _check_data_aliases(path)
     if not path.is_relative_to(base) or base.is_relative_to(ROOT) or ROOT.is_relative_to(base):
         raise RuntimeError('Output must stay inside the separate private data directory')
@@ -155,7 +173,19 @@ def private_path(requested):
     repo = _physical_path(_run(['git', '-C', str(existing), 'rev-parse', '--show-toplevel'])).resolve()
     if not base.is_relative_to(repo) or repo.is_relative_to(ROOT) or ROOT.is_relative_to(repo):
         raise RuntimeError('Output requires a separate versioned PRIVATE companion')
+    if base != repo/'data':
+        raise RuntimeError('Storage must use the companion data/ directory declared in storage.contract.json')
     _prove_publication(repo, configuration)
+    if artifact_id is not None:
+        module_path = ROOT/'guards/tools/storage_contract.py'
+        _physical_path(module_path)
+        if not module_path.is_file():
+            raise RuntimeError('Missing source artifact admission; initialize pinned guards before writing')
+        spec = importlib.util.spec_from_file_location('qq_guard_storage_contract', module_path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        path = module.authorize_artifact_write(
+            ROOT, repo, lexical.relative_to(repo).as_posix(), artifact_id=artifact_id).path
     return path
 
 
@@ -189,20 +219,22 @@ def atomic_output(path):
     """Exclusive writer with distinct uncommitted and committed cleanup failures."""
     path = Path(path)
     _check_data_aliases(path)
+    lock = private_path(path.with_name(path.name+'.lock'), artifact_id='transaction_locks')
+    temporary = private_path(path.with_name('.'+path.name+'-'+uuid.uuid4().hex+'.partial'),
+                             artifact_id='incomplete_outputs')
     path.parent.mkdir(parents=True, exist_ok=True)
-    lock = path.with_name(path.name+'.lock')
     lock_stream = lock.open('x', encoding='utf-8')
-    temporary = None
+    temporary_created = False
     committed = False
     failure = None
     try:
         with lock_stream as stream:
             stream.write('QQ output transaction in progress\n')
-        fd, name = tempfile.mkstemp(prefix='.'+path.name+'-', suffix='.partial', dir=path.parent)
-        temporary = Path(name)
+        fd = os.open(temporary, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        temporary_created = True
         os.close(fd)
         yield temporary
-        _physical_path(temporary)
+        private_path(temporary, artifact_id='incomplete_outputs')
         _check_data_aliases(path)
         os.replace(temporary, path)
         committed = True
@@ -211,7 +243,7 @@ def atomic_output(path):
         raise
     finally:
         cleanup_failures = []
-        for item in (temporary, lock):
+        for item in (temporary if temporary_created else None, lock):
             try:
                 if item is not None and item.exists():
                     item.unlink()
@@ -223,9 +255,9 @@ def atomic_output(path):
 
 
 def write_bundle(path, bundle):
-    path = private_path(path)
+    path = private_path(path, artifact_id='recovery_evidence')
     with atomic_output(path) as temporary:
         temporary.write_text(json.dumps(bundle, ensure_ascii=True, indent=2)+'\n', encoding='utf-8')
-        if private_path(path) != path:
+        if private_path(path, artifact_id='recovery_evidence') != path:
             raise ValueError('evidence destination changed before promotion')
     return path

@@ -5,6 +5,7 @@ import sqlite3
 import subprocess
 
 import pytest
+import qq_storage as S
 
 import make_fixtures as F
 import qq_decode as D
@@ -38,7 +39,8 @@ def test_short_sample_cannot_establish_a_period():
 def test_valid_key_bundle_and_atomic_export(database, tmp_path, monkeypatch):
     bundle = K.evidence_from_pairs(database, known_pairs(), F.OWNER)
     out = tmp_path / 'messages.jsonl'
-    monkeypatch.setattr(D, 'private_path', lambda p: Path(p))
+    monkeypatch.setattr(D, 'private_path', lambda p, **kwargs: Path(p))
+    monkeypatch.setattr(S, 'private_path', lambda p, **kwargs: Path(p))
     result = D.export_database(database, bundle, out)
     records = [json.loads(line) for line in out.read_text(encoding='utf-8').splitlines()]
     assert len(records) == 7 and result['owner_verified'] is True
@@ -60,7 +62,8 @@ def test_invalid_evidence_preserves_previous_export(database, tmp_path, monkeypa
         bundle['known_pairs'] = [bundle['known_pairs'][0]]*2
     out = tmp_path / 'messages.jsonl'
     out.write_bytes(b'previous validated archive\n')
-    monkeypatch.setattr(D, 'private_path', lambda p: Path(p))
+    monkeypatch.setattr(D, 'private_path', lambda p, **kwargs: Path(p))
+    monkeypatch.setattr(S, 'private_path', lambda p, **kwargs: Path(p))
     with pytest.raises((ValueError, RuntimeError)):
         D.export_database(database, bundle, out)
     assert out.read_bytes() == b'previous validated archive\n'
@@ -121,7 +124,8 @@ def test_adb_failure_and_timeout_are_checked(monkeypatch):
 def test_pull_existing_output_is_never_used_as_new_success(tmp_path, monkeypatch):
     out = tmp_path / 'old.db'
     out.write_bytes(b'X'*4096)
-    monkeypatch.setattr(P, 'private_path', lambda p: Path(p))
+    monkeypatch.setattr(P, 'private_path', lambda p, **kwargs: Path(p))
+    monkeypatch.setattr(S, 'private_path', lambda p, **kwargs: Path(p))
     monkeypatch.setattr(P, 'adb', lambda *a: pytest.fail('existing output must fail before device access'))
     with pytest.raises((RuntimeError, ValueError, FileExistsError)):
         P.pull_database('', F.OWNER, out)
@@ -132,7 +136,8 @@ def test_pull_existing_output_is_never_used_as_new_success(tmp_path, monkeypatch
 def test_failed_pull_cleans_staging_and_never_promotes(tmp_path, database, monkeypatch, failure):
     out = tmp_path / 'new.db'
     calls = []
-    monkeypatch.setattr(P, 'private_path', lambda p: Path(p))
+    monkeypatch.setattr(P, 'private_path', lambda p, **kwargs: Path(p))
+    monkeypatch.setattr(S, 'private_path', lambda p, **kwargs: Path(p))
     def fake(serial, *args):
         calls.append(args)
         command = ' '.join(map(str, args))
@@ -168,7 +173,8 @@ def test_completed_pull_is_a_new_unverified_candidate(tmp_path, database, monkey
     import hashlib
     out = tmp_path / 'candidate.db'
     calls = []
-    monkeypatch.setattr(P, 'private_path', lambda p: Path(p))
+    monkeypatch.setattr(P, 'private_path', lambda p, **kwargs: Path(p))
+    monkeypatch.setattr(S, 'private_path', lambda p, **kwargs: Path(p))
     def fake(serial, *args):
         calls.append(args)
         command = ' '.join(args)
@@ -190,7 +196,8 @@ def test_exception_mid_export_preserves_old_archive(database, tmp_path, monkeypa
     bundle = K.evidence_from_pairs(database, known_pairs(), F.OWNER)
     out = tmp_path/'messages.jsonl'
     out.write_bytes(b'previous validated archive\n')
-    monkeypatch.setattr(D, 'private_path', lambda p: Path(p))
+    monkeypatch.setattr(D, 'private_path', lambda p, **kwargs: Path(p))
+    monkeypatch.setattr(S, 'private_path', lambda p, **kwargs: Path(p))
     original = D.decode_db
     def broken(*args):
         yield next(original(*args))
@@ -319,7 +326,7 @@ def test_local_doctor_never_contacts_device(monkeypatch, tmp_path):
     import qq_doctor as Q
     monkeypatch.setattr(Q.shutil, 'which', lambda name: '/synthetic/'+name)
     monkeypatch.setattr(Q.importlib.metadata, 'version', lambda name: '16.1.0')
-    monkeypatch.setattr(Q, 'private_path', lambda path: tmp_path/path)
+    monkeypatch.setattr(Q, 'private_path', lambda path, **kwargs: tmp_path/path)
     monkeypatch.setattr(Q, 'adb', lambda *a: pytest.fail('unexpected device access'))
     result = Q.diagnose()
     assert result['status'] == 'local_ready' and not result['device_checked'] and not result['export_tested']
@@ -329,7 +336,7 @@ def test_doctor_rejects_unmatched_server_and_nt(monkeypatch, tmp_path):
     import qq_doctor as Q
     monkeypatch.setattr(Q.shutil, 'which', lambda name: '/synthetic/'+name)
     monkeypatch.setattr(Q.importlib.metadata, 'version', lambda name: '16.1.0')
-    monkeypatch.setattr(Q, 'private_path', lambda path: tmp_path/path)
+    monkeypatch.setattr(Q, 'private_path', lambda path, **kwargs: tmp_path/path)
     def fake(*args):
         cmd = args[-1]
         stdout = 'versionName=9.0' if 'dumpsys' in cmd else '17.0.0' if '--version' in cmd else '0'

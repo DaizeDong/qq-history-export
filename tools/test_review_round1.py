@@ -24,7 +24,8 @@ def test_wal_commit_during_export_preserves_old_archive(database, tmp_path, monk
     proof = K.evidence_from_pairs(database, known_pairs(), F.OWNER)
     out = tmp_path/'archive.jsonl'
     out.write_bytes(b'previous validated archive\n')
-    monkeypatch.setattr(D, 'private_path', lambda p: Path(p))
+    monkeypatch.setattr(D, 'private_path', lambda p, **kwargs: Path(p))
+    monkeypatch.setattr(S, 'private_path', lambda p, **kwargs: Path(p))
     original = D.decode_db
     writer = None
 
@@ -56,7 +57,8 @@ def test_wal_commit_during_export_preserves_old_archive(database, tmp_path, monk
 @pytest.mark.parametrize('suffix', ['-wal', '-journal', '-shm'])
 def test_export_cannot_occupy_database_sidecars(database, monkeypatch, suffix):
     proof = K.evidence_from_pairs(database, known_pairs(), F.OWNER)
-    monkeypatch.setattr(D, 'private_path', lambda p: Path(p))
+    monkeypatch.setattr(D, 'private_path', lambda p, **kwargs: Path(p))
+    monkeypatch.setattr(S, 'private_path', lambda p, **kwargs: Path(p))
     out = Path(str(database)+suffix)
     with pytest.raises(ValueError, match='input|sidecar|database'):
         D.export_database(database, proof, out)
@@ -65,7 +67,8 @@ def test_export_cannot_occupy_database_sidecars(database, monkeypatch, suffix):
 
 @pytest.mark.parametrize('suffix', ['-wal', '-journal', '-shm'])
 def test_recovery_cannot_occupy_database_sidecars_before_device_access(database, monkeypatch, suffix):
-    monkeypatch.setattr(K, 'private_path', lambda p: Path(p))
+    monkeypatch.setattr(K, 'private_path', lambda p, **kwargs: Path(p))
+    monkeypatch.setattr(S, 'private_path', lambda p, **kwargs: Path(p))
     monkeypatch.setattr(K, 'recover_key', lambda *a: pytest.fail('unexpected device access'))
     monkeypatch.setattr(sys, 'argv', ['qq_keyfind.py', '--db', str(database), '--owner', F.OWNER,
                                     '--out', str(database)+suffix])
@@ -76,7 +79,8 @@ def test_output_lock_cannot_replace_database_input(database, tmp_path, monkeypat
     source = tmp_path/'archive.lock'
     database.rename(source)
     proof = K.evidence_from_pairs(source, known_pairs(), F.OWNER)
-    monkeypatch.setattr(D, 'private_path', lambda p: Path(p))
+    monkeypatch.setattr(D, 'private_path', lambda p, **kwargs: Path(p))
+    monkeypatch.setattr(S, 'private_path', lambda p, **kwargs: Path(p))
     with pytest.raises(ValueError, match='input|database'):
         D.export_database(source, proof, tmp_path/'archive')
 
@@ -115,6 +119,7 @@ def test_reading_checkpointed_wal_input_does_not_create_sidecars(database):
 
 
 def test_committed_output_has_explicit_receipt_if_lock_cleanup_fails(tmp_path, monkeypatch):
+    monkeypatch.setattr(S, 'private_path', lambda p, **kwargs: Path(p))
     out = tmp_path/'archive.jsonl'
     out.write_bytes(b'old')
     unlink = Path.unlink
@@ -135,6 +140,7 @@ def test_committed_output_has_explicit_receipt_if_lock_cleanup_fails(tmp_path, m
 
 
 def test_prepromotion_error_and_cleanup_failure_preserve_old_archive(tmp_path, monkeypatch):
+    monkeypatch.setattr(S, 'private_path', lambda p, **kwargs: Path(p))
     out = tmp_path/'archive.jsonl'
     out.write_bytes(b'old')
     unlink = Path.unlink
@@ -183,7 +189,8 @@ def test_cli_reports_committed_cleanup_receipt(command, tmp_path, monkeypatch, c
         monkeypatch.setattr(sys, 'argv', ['qq_pull.py', '--out', str(out)])
         main = P.main
     elif command == 'recover':
-        monkeypatch.setattr(K, 'private_path', lambda p: Path(p))
+        monkeypatch.setattr(K, 'private_path', lambda p, **kwargs: Path(p))
+        monkeypatch.setattr(S, 'private_path', lambda p, **kwargs: Path(p))
         monkeypatch.setattr(K, 'recover_key', fail)
         monkeypatch.setattr(sys, 'argv', ['qq_keyfind.py', '--out', str(out),
                                         '--db', str(tmp_path/'source.db'), '--owner', F.OWNER])
@@ -191,7 +198,8 @@ def test_cli_reports_committed_cleanup_receipt(command, tmp_path, monkeypatch, c
     else:
         evidence = tmp_path/'evidence.json'
         evidence.write_text('{}')
-        monkeypatch.setattr(D, 'private_path', lambda p: Path(p))
+        monkeypatch.setattr(D, 'private_path', lambda p, **kwargs: Path(p))
+        monkeypatch.setattr(S, 'private_path', lambda p, **kwargs: Path(p))
         monkeypatch.setattr(D, 'export_database', fail)
         monkeypatch.setattr(sys, 'argv', ['qq_decode.py', '--out', str(out),
                                         '--db', str(tmp_path/'source.db'), '--evidence', str(evidence)])

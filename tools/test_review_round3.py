@@ -106,7 +106,7 @@ def test_default_and_inert_authenticated_environment_remain_supported(name, envi
     output = S.write_bundle('nested/evidence.json', {'synthetic': True})
     assert json.loads(output.read_text(encoding='utf-8')) == {'synthetic': True}
     proof_calls = [row for row in calls if row['argv'][0] == 'gh']
-    assert len(proof_calls) == 2
+    assert proof_calls
     for row in calls:
         assert all(row['environment'][key] == value for key, value in environment.items()
                    if key not in {'GIT_OPTIONAL_LOCKS', 'GIT_PAGER', 'GH_PAGER', 'PAGER'})

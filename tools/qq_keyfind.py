@@ -139,7 +139,8 @@ def main():
     parser.add_argument('--seconds', type=int, default=20)
     args = parser.parse_args()
     try:
-        db, output = private_path(args.db), private_path(args.out)
+        db = private_path(args.db)
+        output = private_path(args.out, artifact_id='recovery_evidence')
         reject_input_alias(output, [db], database=db)
         bundle = recover_key(db, args.owner, args.host, args.pid, args.seconds)
         write_bundle(output, bundle)
