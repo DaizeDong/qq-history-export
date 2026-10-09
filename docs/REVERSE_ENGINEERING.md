@@ -47,31 +47,31 @@ database: it depends only on the byte offset inside the field, not on the row, t
 sender. The proof is that one identical short message produces byte identical `msgData` in two
 different tables.
 
-The one thing you must get right is the period. On the reference device the key is fifteen bytes of
-ASCII digits. An earlier pass mistook the first nine of those bytes for the whole key, which
-happened to decode the first three Chinese characters of every message (nine bytes is exactly three
-UTF-8 characters) and then diverged into garbage. That looked like a per message keystream and sent
-the analysis down a blind alley. It was simply the wrong period. Once the period is fifteen, the
-same key decodes every message in the database to the end, at full coverage.
+Correct recovery requires the full key period. The historical reference device used
+fifteen ASCII-digit bytes. A nine-byte prefix decoded only the first three Chinese
+UTF-8 characters and then diverged; a fifteen-byte period decoded that reference
+database with full coverage. This observation does not establish a fixed period
+for other installations. The current implementation detects periods from 1 through
+64 bytes and verifies the complete known-message evidence.
 
-## Recovering the key is easy from the running client, hard from the database alone
+## Recovering the key from observed plaintext
 
 You can read the first nine key bytes straight out of any owner sent row: `senderuin` there is the
 owner account number, which is known plaintext, so XOR the stored bytes against the ASCII digits of
 the account number. That gives nine bytes, which is not the whole fifteen, and trying to extend the
 key by voting on UTF-8 validity across many messages is unreliable in practice.
 
-The running client hands you the rest for free. When QQ loads a message it builds an in memory
+The running client provides longer plaintext observations. When QQ loads a message it builds an in memory
 `com.tencent.mobileqq.data.MessageFor*` object whose `msg` field holds the already decoded text and
 whose `uniseq` field holds the same message identity that keys the encrypted row on disk. So the
 recovery is: attach to the running client, walk the Java heap for `MessageFor*` instances, read
 their `msg` and `uniseq`, and for one message that is at least as long as the period, look up the
 encrypted `msgData` for that `uniseq` in the database. XOR the aligned plaintext and ciphertext and
-the repeating key falls straight out. The current implementation requires two distinct complete
+the repeating key can be recovered. The current implementation requires two distinct complete
 known messages, each spanning at least two periods. Both independently recovered keys must agree
 byte for byte, and all other aligned observations must match. This is what `tools/qq_keyfind.py`
 does. It does not call any decrypt routine inside the client; it only reads plaintext the client
-already decoded and lets the XOR give up the key.
+already decoded and derives the key through XOR.
 
 After the key is recovered once, the whole database decodes offline with `tools/qq_decode.py`. The
 recovery reads the client's heap but never writes to it and never patches it.

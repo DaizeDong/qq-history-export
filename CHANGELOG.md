@@ -4,14 +4,10 @@ All notable changes to this project are documented here (Keep a Changelog style)
 
 ## [Unreleased]
 
+### Changed
 - Bind concrete runtime writer destinations and transaction files to canonical source artifact admission before creation. Offline regression controls preserve PRIVATE, retention, topology and versioning refusals.
-
-
-### Storage review threshold
 - Set a 64 MiB companion working-data review threshold. Required observations and
   recovery state stay protected when the threshold is exceeded.
-
-### Changed
 - Require database-bound key and account evidence for export, with independent known plaintext observations and variable-period XOR recovery.
 - Freeze the database snapshot used for validation and export; reject journal activity, invalid identities and incomplete selected-text decoding before replacement.
 - Verify a PRIVATE versioned destination before writing databases, recovery evidence or JSONL output.

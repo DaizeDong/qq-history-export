@@ -41,7 +41,20 @@ Load `skills/qq-history-export/SKILL.md` from the canonical clone. Run the comma
 
 ## Config
 
-Point `QQ_HISTORY_EXPORT_CONFIG` at a separately cloned PRIVATE companion with an existing `data/` directory. `QQ_HISTORY_EXPORT_DATA_DIR` can select its existing data directory directly. The pinned guard resolves the location; Git and `gh` verify the actual destination repository. Public, unknown and unversioned destinations fail. Real records are committed in the private companion; credentials remain outside Git.
+Select a separately cloned PRIVATE companion with an existing `data/` directory
+using `QQ_HISTORY_EXPORT_CONFIG`, or select that exact child with
+`QQ_HISTORY_EXPORT_DATA_DIR`. DATA_DIR takes precedence over CONFIG, then CONFIG_DIR;
+shared discovery follows. Clear inherited DATA_DIR before switching CONFIG.
+Missing storage fails before device access or output creation. Installation needs
+no empty companion or settings registry.
+
+[DATA.md](DATA.md) defines full discovery and artifact retention. Final files and
+their lock/partial paths require source ownership, committed PRIVATE storage,
+a fresh local Guards visibility receipt and effective Git trackability before
+creation and promotion. Real records remain versioned in the private companion;
+credentials remain outside Git. [The workflow](docs/WORKFLOW.md) specifies authenticated
+`gh`, supported Git TLS backends and bundled-CA proof; custom trust overrides remain
+rejected. Ignored transaction artifacts refuse the operation.
 
 ## Quickstart
 
@@ -83,21 +96,3 @@ English (`README.md`, authoritative) and 中文 (`README_CN.md`).
 ## Roadmap and license
 
 [ROADMAP.md](ROADMAP.md) | [CHANGELOG.md](CHANGELOG.md) | [MIT](LICENSE).
-
-Storage-only discovery uses `QQ_HISTORY_EXPORT_DATA_DIR` first, then
-`QQ_HISTORY_EXPORT_CONFIG`, then its `QQ_HISTORY_EXPORT_CONFIG_DIR` alias, followed by
-[Guards companion discovery](guards/COMPANION.md) for proven siblings and home defaults
-(`~/.qq-history-export-config` and `~/.qq-history-export-data`). All accepted layouts
-must resolve to the companion root plus `data/`. A selected CONFIG without that child
-is uninitialized and fails before device access or output creation. Clear an inherited
-DATA_DIR before switching CONFIG. No settings registry or empty companion is required.
-
-Final output admission also requires a fresh local [Guards visibility receipt](guards/COMPANION.md),
-a committed companion and a declared final file that Git does not ignore. Database, key evidence
-and JSONL writers bind their own artifact type before device work and before final promotion.
-
-Standard Git TLS backend selection is supported. Git for Windows bundled CA configuration
-uses canonical Guards proof; custom CA or disabled verification remains rejected. See
-[the workflow](docs/WORKFLOW.md) for the exact transport policy.
-
-Atomic output transactions now admit their declared lock and generated partial paths before any creation, and recheck the partial before promotion. Ignored transaction artifacts refuse the operation, just as ignored final outputs do. Offline controls exercise this behavior without accessing a device.

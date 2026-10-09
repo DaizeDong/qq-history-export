@@ -16,8 +16,8 @@ and account. Ask one combined question only for missing storage, ambiguous devic
 or an unclear export scope. An explicit export request permits its necessary device reads;
 a maintenance or review request alone does not.
 
-Load `../../docs/WORKFLOW.md` for exact commands and failure recovery. Load
-`../../docs/REVERSE_ENGINEERING.md` only for schema or cipher details.
+Load [the workflow](../../docs/WORKFLOW.md) for exact commands and failure recovery.
+Load [reverse-engineering notes](../../docs/REVERSE_ENGINEERING.md) for schema or cipher details.
 
 ## Required boundaries
 
@@ -33,6 +33,8 @@ Load `../../docs/WORKFLOW.md` for exact commands and failure recovery. Load
 - Short readable prefixes and UTF-8 coverage cannot validate a key. Require two distinct exact
   known plaintext rows, each spanning at least two complete periods, plus matching account fields.
   Never assume a fixed period from an earlier installation.
+
+Before output creation, the writer checks the final artifact and its exact lock/partial transaction paths through source ownership and PRIVATE admission. Ignored versioned transaction files refuse the operation. Preserve any explicit cleanup receipt for unresolved transactions.
 
 ## Pipeline
 
@@ -70,5 +72,3 @@ review. Do not claim whole-account completeness or universal device compatibilit
 Run `python -m pytest tools -q` and `python tools/test_qq.py` from the canonical repository root.
 Fixtures come from `tools/make_fixtures.py`; device/Frida regression calls are intercepted.
 Synthetic passing tests do not constitute a live-device export.
-
-Before output creation, the writer checks the final artifact and its exact lock/partial transaction paths through source ownership and PRIVATE admission. Ignored versioned transaction files refuse the operation. Preserve any explicit cleanup receipt for unresolved transactions.

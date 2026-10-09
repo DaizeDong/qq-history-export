@@ -7,7 +7,9 @@ The selected companion must contain `data/`; DATA_DIR overrides must name that e
 child. See [DATA.md](../DATA.md) for selector precedence and switching. Final outputs
 also require a fresh local Guards visibility receipt, committed HEAD and an unignored
 path owned by the corresponding artifact in `storage.contract.json`. These checks run
-before device work and again before atomic promotion; read-only inputs retain their
+before device work and again before atomic promotion. Exact lock and generated partial
+paths also require admission before creation; the partial is checked again before
+promotion. Ignored transaction files are refused. Read-only inputs retain their
 separate resolution contract.
 
 Every configured remote must have canonical `https://github.com/OWNER/REPO` effective
@@ -26,6 +28,8 @@ names and other TLS trust overrides remain rejected. Inert `GIT_PREFIX`, `GIT_IN
 `PAGER`) are accepted and removed from captured subprocess environments.
 Use a canonical HTTPS companion without routing overrides. DATA paths, ancestors,
 locks and SQLite sidecars cannot be symlinks, reparse points or multiply linked files.
+
+## Commands and device selection
 
 Run from the canonical tool repository root. Commands use paths relative to the private data
 home. The account 10000 below is generated synthetic data, not an actual account.
@@ -47,6 +51,8 @@ For multiple devices, add `--serial` to pull. Multiple accounts require `--uin`;
 chooses an arbitrary first account. Root must already be available through adb shell. A snapshot
 with an active WAL/journal is rejected. Obtain a stable snapshot yourself before retrying; this
 tool does not stop the application to force one.
+
+## Snapshot and recovery
 
 Pull uses a unique `/data/local/tmp/qq-export-<random>.db` staging file, restrictive umask 077
 before copying, and mode 600. It checks copy, chmod, pull and removal. Device staging cleanup is
@@ -72,6 +78,8 @@ NULL/non-numeric message identities fail; signed 64-bit identities are canonical
 for uniqueness. Output and lock paths cannot alias the database, its WAL/SHM/journal, or evidence.
 Empty exports, malformed timestamps, source changes and pre-promotion failures preserve old bytes.
 
+## Interrupted transactions
+
 Transaction locks prevent overlapping writers. A crash may leave a lock or partial file; inspect
 what the previous operation completed before deleting it. After replacement, cleanup failure
 returns nonzero with `status=committed_cleanup_required`, `committed=true`, the output path and
@@ -79,6 +87,8 @@ remaining cleanup paths. The new output already exists. Before replacement, clea
 returns `failed_cleanup_required` with `committed=false`. Do not describe either as a clean run,
 or describe a committed output as an unchanged old archive. Real artifacts and evidence are
 versioned in the PRIVATE companion. Do not publish examples copied from a real run.
+
+## Evidence limits
 
 The CLI evidence is local and unsigned, not proof supplied by QQ. It cannot authenticate a bundle
 forged by someone who can modify both the database and evidence. Read-only synthetic tests cover
