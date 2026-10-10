@@ -14,7 +14,12 @@ import qq_storage as S
 
 
 @pytest.fixture
-def companion(tmp_path, monkeypatch):
+def visibility_proofs():
+    return []
+
+
+@pytest.fixture
+def companion(tmp_path, monkeypatch, visibility_proofs):
     tool, repo, base = F.build_storage_fixture(tmp_path)
     scenario = F.storage_routes()['private']
     calls = []
@@ -47,6 +52,9 @@ def companion(tmp_path, monkeypatch):
         raise AssertionError('Device or database execution must not be reached')
 
     monkeypatch.setattr(S.subprocess, 'run', run)
+    # The live visibility answer comes from the pinned Guards kit (any logged-in gh account);
+    # its own synthetic-gh tests live in test_visibility_any_gh_account.py.
+    monkeypatch.setattr(S, '_github_private', lambda name: visibility_proofs.append(name) or 'true')
     monkeypatch.setattr(P, 'adb', device)
     monkeypatch.setattr(K, 'recover_key', device)
     monkeypatch.setattr(D, 'export_database', device)
@@ -99,14 +107,14 @@ def test_proof_subprocess_rechecks_trust_environment(case, companion, monkeypatc
 
 
 @pytest.mark.parametrize('name,environment', F.storage_https_positive_environments().items())
-def test_default_and_inert_authenticated_environment_remain_supported(name, environment, companion, monkeypatch):
+def test_default_and_inert_authenticated_environment_remain_supported(name, environment, companion, monkeypatch,
+                                                                       visibility_proofs):
     base, calls, device_calls = companion
     for key, value in environment.items():
         monkeypatch.setenv(key, value)
     output = S.write_bundle('nested/evidence.json', {'synthetic': True})
     assert json.loads(output.read_text(encoding='utf-8')) == {'synthetic': True}
-    proof_calls = [row for row in calls if row['argv'][0] == 'gh']
-    assert proof_calls
+    assert visibility_proofs
     for row in calls:
         assert all(row['environment'][key] == value for key, value in environment.items()
                    if key not in {'GIT_OPTIONAL_LOCKS', 'GIT_PAGER', 'GH_PAGER', 'PAGER'})
