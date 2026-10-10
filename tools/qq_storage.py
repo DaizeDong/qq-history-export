@@ -15,10 +15,17 @@ from qq_database import SIDECARS
 ROOT = Path(__file__).resolve().parents[1]
 
 
+_VISIBILITY_PREFIX = ['gh', 'api', '--hostname', 'github.com']
+_VISIBILITY_SUFFIX = ['--jq', '.private']
+
+
 def _run(argv):
     env = {name: value for name, value in os.environ.items()
            if name.upper() not in {'GIT_PAGER', 'GH_PAGER', 'PAGER'}}
     _check_environment(env)
+    if (len(argv) == 7 and list(argv[:4]) == _VISIBILITY_PREFIX and list(argv[5:]) == _VISIBILITY_SUFFIX
+            and isinstance(argv[4], str) and argv[4].startswith('repos/')):
+        return _github_private(argv[4][len('repos/'):])
     env.update(GIT_OPTIONAL_LOCKS='0', GIT_TERMINAL_PROMPT='0')
     try:
         p = subprocess.run(argv, capture_output=True, text=True, encoding='utf-8', timeout=20, env=env)
@@ -27,6 +34,30 @@ def _run(argv):
     if p.returncode:
         raise RuntimeError('Private storage verification failed: '+argv[0])
     return p.stdout.strip()
+
+
+def _github_private(name):
+    """Live PRIVATE answer for OWNER/NAME, independent of the ACTIVE gh account.
+
+    A plain `gh api repos/OWNER/NAME` asks only with whichever account `gh auth switch` last
+    selected, so an active account that cannot see the companion failed every proof closed. The
+    pinned Guards kit asks with the owner's stored account, then every other stored account, then
+    gh's default, and refuses only when none can see it. Returns 'true' only for PRIVATE."""
+    module_path = ROOT/'guards/tools/data_boundary.py'
+    _physical_path(module_path)
+    if not module_path.is_file():
+        raise RuntimeError('Missing guards visibility query; initialize pinned submodules')
+    spec = importlib.util.spec_from_file_location('qq_guard_visibility_boundary', module_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    ask = getattr(module, 'query_github_visibility', None)
+    if not callable(ask):
+        raise RuntimeError('Guards dependency lacks the account-independent visibility API')
+    try:
+        visibility = ask(name)
+    except module.GitError as exc:
+        raise RuntimeError('Private storage verification failed: no gh credential can see the companion') from exc
+    return 'true' if visibility == 'PRIVATE' else 'false'
 
 
 def _check_environment(environment=None):
