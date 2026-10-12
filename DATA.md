@@ -9,8 +9,8 @@ and evidence validator remain authoritative for content and verification.
 Paths are relative to a separate PRIVATE companion root.
 Storage-only discovery uses `QQ_HISTORY_EXPORT_DATA_DIR` first, then
 `QQ_HISTORY_EXPORT_CONFIG`, then its `QQ_HISTORY_EXPORT_CONFIG_DIR` alias, followed by
-[Guards companion discovery](guards/COMPANION.md) for proven siblings and home defaults
-(`~/.qq-history-export-config` and `~/.qq-history-export-data`). All accepted layouts
+[Guards companion discovery](guards/COMPANION.md) for proven siblings (there is no
+home-directory default). All accepted layouts
 must resolve to the companion root plus `data/`. A selected CONFIG without that child
 is uninitialized and fails before device access or output creation. Clear an inherited
 DATA_DIR before switching CONFIG. No settings registry or empty companion is required.
