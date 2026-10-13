@@ -11,6 +11,8 @@ All notable changes to this project are documented here (Keep a Changelog style)
 - The live PRIVATE visibility check no longer depends on which gh account is active: it asks through the pinned guards kit's `query_github_visibility`, which tries the owner's stored account, every other stored account, then gh's default, and never switches the active account. Before, an active account that could not see the companion made every proof fail closed. Only PRIVATE is accepted.
 
 ### Changed
+- `qq_storage` loads `guards/tools/datadir.py` and resolves the companion `data/` directory once per process for each tool root and selector values, instead of on every `private_path` call. `write_bundle` and `qq_decode.export_database` drop their own "destination changed" recheck; `atomic_output` still rechecks before promotion and `qq_pull` keeps its recheck across the device copy.
+- `qq_doctor` no longer lists `git` as a readiness requirement; no runtime tool runs it. The plugin description, ROADMAP and the `qq_decode --out` help say "private companion" instead of "verified private companion".
 - Bind concrete runtime writer destinations and transaction files to canonical source artifact admission before creation. Offline regression controls preserve PRIVATE, retention, topology and versioning refusals.
 - Set a 64 MiB companion working-data review threshold. Required observations and
   recovery state stay protected when the threshold is exceeded.

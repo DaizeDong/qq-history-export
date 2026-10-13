@@ -16,8 +16,7 @@ def diagnose(serial='', device=False, server_binary='frida-server'):
     checks = []
     def record(name, ready, detail):
         checks.append(dict(check=name, ready=bool(ready), detail=detail))
-    for executable in ('adb', 'git'):
-        record(executable, shutil.which(executable) is not None, 'executable discovery')
+    record('adb', shutil.which('adb') is not None, 'executable discovery')
     try:
         version = importlib.metadata.version('frida')
     except importlib.metadata.PackageNotFoundError:

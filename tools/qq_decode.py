@@ -70,8 +70,6 @@ def export_database(db_path, bundle, output):
                     mine += record['is_me']
             if not count:
                 raise ValueError('empty export')
-        if private_path(output) != output:
-            raise ValueError('output destination changed during export')
     return dict(exported=count, owner_messages=mine, decoding_coverage=coverage,
                 owner_verified=True, key_evidence='known_plaintext_verified', database_sha256=before, output=str(output))
 
@@ -80,7 +78,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--db', required=True)
     parser.add_argument('--evidence', required=True, help='private recovery bundle from qq_keyfind.py')
-    parser.add_argument('--out', required=True, help='path inside the verified private companion data directory')
+    parser.add_argument('--out', required=True, help='path inside the private companion data directory')
     args = parser.parse_args()
     try:
         db = private_path(args.db)

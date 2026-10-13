@@ -1,5 +1,6 @@
 """Resolve QQ runtime artifacts inside the companion data/ directory (path-only checks)."""
 from contextlib import contextmanager
+from functools import lru_cache
 import importlib.util
 import json
 import os
@@ -37,29 +38,32 @@ def _check_data_aliases(path):
         _physical_path(Path(str(path)+suffix))
 
 
-def private_path(requested):
-    """Resolve a DATA path inside the companion data/ directory. Path-only: no Git or gh runs.
+_SELECTORS = ('QQ_HISTORY_EXPORT_DATA_DIR', 'QQ_HISTORY_EXPORT_CONFIG', 'QQ_HISTORY_EXPORT_CONFIG_DIR')
 
-    Keeping DATA out of public repositories is enforced at commit and push time by the hooks
-    and CI. Here the companion must already exist, the data directory must be named data/ and
-    sit outside this source tree, and the result must stay inside it on ordinary files.
-    """
-    for selector in ('QQ_HISTORY_EXPORT_DATA_DIR', 'QQ_HISTORY_EXPORT_CONFIG', 'QQ_HISTORY_EXPORT_CONFIG_DIR'):
-        value = os.environ.get(selector)
-        if value:
-            if not _physical_path(value).is_dir():
-                raise RuntimeError('Explicit private storage selector does not exist: '+selector)
-            if selector != 'QQ_HISTORY_EXPORT_DATA_DIR' and not _physical_path(Path(value)/'data').is_dir():
-                raise RuntimeError('Uninitialized: selected companion requires its declared data/ directory')
-            break
-    module_path = ROOT/'guards/tools/datadir.py'
+
+@lru_cache(maxsize=None)
+def _datadir_module(root):
+    module_path = root/'guards/tools/datadir.py'
     _physical_path(module_path)
     if not module_path.is_file():
         raise RuntimeError('Missing guards; initialize pinned submodules before using runtime tools')
     spec = importlib.util.spec_from_file_location('qq_guard_datadir', module_path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    base = module.resolve_data_dir('qq-history-export')
+    return module
+
+
+@lru_cache(maxsize=None)
+def _data_base(root, selection):
+    """The companion data/ directory, resolved and checked once per tool root and selector values."""
+    for selector, value in zip(_SELECTORS, selection):
+        if value:
+            if not _physical_path(value).is_dir():
+                raise RuntimeError('Explicit private storage selector does not exist: '+selector)
+            if selector != 'QQ_HISTORY_EXPORT_DATA_DIR' and not _physical_path(Path(value)/'data').is_dir():
+                raise RuntimeError('Uninitialized: selected companion requires its declared data/ directory')
+            break
+    base = _datadir_module(root).resolve_data_dir('qq-history-export')
     if base is None:
         raise RuntimeError('Uninitialized: set QQ_HISTORY_EXPORT_CONFIG to a private companion clone with data/')
     base = _physical_path(base).resolve()
@@ -67,8 +71,20 @@ def private_path(requested):
         raise RuntimeError('Resolved private data directory does not exist')
     if base.name != 'data':
         raise RuntimeError('Storage must use the companion data/ directory declared in storage.contract.json')
-    if base.is_relative_to(ROOT) or ROOT.is_relative_to(base):
+    if base.is_relative_to(root) or root.is_relative_to(base):
         raise RuntimeError('Output requires a companion outside this source repository')
+    return base
+
+
+def private_path(requested):
+    """Resolve a DATA path inside the companion data/ directory. Path-only: no Git or gh runs.
+
+    Keeping DATA out of public repositories is enforced at commit and push time by the hooks
+    and CI. Here the companion must already exist, the data directory must be named data/ and
+    sit outside this source tree, and the result must stay inside it on ordinary files. The
+    data directory is resolved once per process for each selector configuration.
+    """
+    base = _data_base(ROOT, tuple(os.environ.get(selector) for selector in _SELECTORS))
     path = Path(requested).expanduser()
     path = path if path.is_absolute() else base/path
     path = _physical_path(path).resolve()
@@ -146,6 +162,4 @@ def write_bundle(path, bundle):
     path = private_path(path)
     with atomic_output(path) as temporary:
         temporary.write_text(json.dumps(bundle, ensure_ascii=True, indent=2)+'\n', encoding='utf-8')
-        if private_path(path) != path:
-            raise ValueError('evidence destination changed before promotion')
     return path
