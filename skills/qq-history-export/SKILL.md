@@ -21,9 +21,10 @@ Load [reverse-engineering notes](../../docs/REVERSE_ENGINEERING.md) for schema o
 
 ## Required boundaries
 
-- Runtime databases, keys, known plaintext and output are DATA in a verified PRIVATE versioned
+- Runtime databases, keys, known plaintext and output are DATA in a private versioned
   companion. Set `QQ_HISTORY_EXPORT_CONFIG` or `QQ_HISTORY_EXPORT_DATA_DIR`. The CLI rejects
-  unknown/public/unversioned destinations and has no tool-repository fallback. CONFIG requires
+  destinations outside that `data/` directory or inside the tool repository and has no
+  tool-repository fallback. CONFIG requires
   an existing `data/` child. DATA_DIR must select that exact child; see [storage discovery](../../DATA.md)
   for precedence, CONFIG_DIR and switching. Uninitialized storage stops before device access.
 - Use only an already rooted device with the classic client. Do not install root, patch QQ,
@@ -34,7 +35,7 @@ Load [reverse-engineering notes](../../docs/REVERSE_ENGINEERING.md) for schema o
   known plaintext rows, each spanning at least two complete periods, plus matching account fields.
   Never assume a fixed period from an earlier installation.
 
-Before output creation, the writer checks the final artifact and its exact lock/partial transaction paths through source ownership and PRIVATE admission. Ignored versioned transaction files refuse the operation. Preserve any explicit cleanup receipt for unresolved transactions.
+Before output creation, the writer resolves the final artifact and its exact lock/partial transaction paths inside the companion `data/` directory (path-only; no Git or gh call). Preserve any explicit cleanup receipt for unresolved transactions.
 
 ## Pipeline
 

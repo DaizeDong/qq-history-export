@@ -18,7 +18,7 @@ the decoded account fields before replacing an archive. Decoding coverage remain
 
 This choice requires observation of a supported running client and refuses exports when the
 evidence is incomplete. It preserves the previous archive when transfer or validation fails.
-Databases, recovery evidence and decoded messages stay in a verified PRIVATE versioned companion,
+Databases, recovery evidence and decoded messages stay in a private versioned companion,
 so an export can be retained and compared without placing chat history in the public tool.
 Synthetic checks establish the local contracts; device compatibility and whole-account completeness
 still need their own evidence.
@@ -29,7 +29,7 @@ still need their own evidence.
 
 Classic mobile QQ (`com.tencent.mobileqq`, pre-NT 8.x) is supported by the documented schema. QQ NT and other schemas are rejected. The workflow needs an already rooted Android device or emulator, adb, a running QQ client, and matching Frida 16.x Python/server installations with the Java bridge. It does not install root or start/stop the application. Live compatibility must be checked on the selected device.
 
-Python 3.11 or newer, Git and authenticated `gh` are required. The device must provide `sha256sum`. A live SQLite WAL or rollback journal blocks raw copying; obtain a stable snapshot before retrying.
+Python 3.11 or newer is required. The device must provide `sha256sum`. A live SQLite WAL or rollback journal blocks raw copying; obtain a stable snapshot before retrying.
 
 ## Install
 
@@ -49,12 +49,10 @@ Missing storage fails before device access or output creation. Installation need
 no empty companion or settings registry.
 
 [DATA.md](DATA.md) defines full discovery and artifact retention. Final files and
-their lock/partial paths require source ownership, committed PRIVATE storage,
-a fresh local Guards visibility receipt and effective Git trackability before
-creation and promotion. Real records remain versioned in the private companion;
-credentials remain outside Git. [The workflow](docs/WORKFLOW.md) specifies authenticated
-`gh`, supported Git TLS backends and bundled-CA proof; custom trust overrides remain
-rejected. Ignored transaction artifacts refuse the operation.
+their lock/partial paths must resolve inside that `data/` directory, outside this
+source tree, on ordinary files, before creation and promotion. The check is path-only;
+commit and push hooks keep DATA out of public repositories. Real records remain
+versioned in the private companion; credentials remain outside Git.
 
 ## Quickstart
 

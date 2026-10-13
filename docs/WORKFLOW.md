@@ -1,33 +1,15 @@
 # Classic QQ export workflow
 
 Start with a separately cloned PRIVATE companion, create its data directory, and point
-`QQ_HISTORY_EXPORT_CONFIG` to that clone. Git and authenticated gh verify visibility.
-An explicit invalid pointer fails; there is no public or unversioned fallback.
-The selected companion must contain `data/`; DATA_DIR overrides must name that exact
-child. See [DATA.md](../DATA.md) for selector precedence and switching. Final outputs
-also require a fresh local Guards visibility receipt, committed HEAD and an unignored
-path owned by the corresponding artifact in `storage.contract.json`. These checks run
-before device work and again before atomic promotion. Exact lock and generated partial
-paths also require admission before creation; the partial is checked again before
-promotion. Ignored transaction files are refused. Read-only inputs retain their
-separate resolution contract.
-
-Every configured remote must have canonical `https://github.com/OWNER/REPO` effective
-fetch and push URLs, including Git URL rewrites, and every destination must verify
-as PRIVATE. Selected branch and push remotes must name one of these configured
-remotes. SSH URLs and aliases are currently unsupported because this consumer has
-no admitted static SSH verifier; it never invokes SSH to inspect configuration.
-Git repository/configuration/transport overrides, HTTP routing configuration and
-proxy environment variables are rejected. The ordinary unscoped `http.sslBackend`
-values `openssl` and `schannel` are allowed; this selects Git's standard TLS backend
-without disabling certificate validation. An unscoped `http.sslCAInfo` is accepted
-only when canonical Guards proof establishes the selected Git installation's bundled
-CA file and PRIVATE routes. Custom CA files, URL-scoped backends, unknown backend
-names and other TLS trust overrides remain rejected. Inert `GIT_PREFIX`, `GIT_INDEX_FILE` and
-`GIT_OPTIONAL_LOCKS` hints remain supported. Pager settings (`GIT_PAGER`, `GH_PAGER`,
-`PAGER`) are accepted and removed from captured subprocess environments.
-Use a canonical HTTPS companion without routing overrides. DATA paths, ancestors,
-locks and SQLite sidecars cannot be symlinks, reparse points or multiply linked files.
+`QQ_HISTORY_EXPORT_CONFIG` to that clone. An explicit invalid pointer fails; there is
+no public or unversioned fallback. The selected companion must contain `data/`;
+DATA_DIR overrides must name that exact child and it must sit outside this source
+tree. See [DATA.md](../DATA.md) for selector precedence and switching. Final outputs,
+their exact lock and generated partial paths are resolved inside that directory before
+device work and again before atomic promotion. These checks are path-only: no Git or
+GitHub call runs at write time, and keeping DATA out of public repositories is enforced
+by the commit and push hooks. DATA paths, ancestors, locks and SQLite sidecars cannot
+contain a `.git` component or be symlinks, reparse points or multiply linked files.
 
 ## Commands and device selection
 

@@ -26,13 +26,17 @@ DATA_DIR before switching CONFIG. No settings registry or empty companion is req
 The documented flat directories keep final files distinct from temporary
 `.qq-snapshot-*` copies, `.partial` files, and transaction locks. CLI relative paths
 are relative to the private `data` directory. Other filenames or directory layouts
-need an explicit contract entry before use. Output entrypoints bind the final file
-to its declared database, evidence or export artifact and use shared write admission
-before access and again before promotion. This requires committed PRIVATE storage,
-a fresh local Guards visibility receipt and a final path that Git does not ignore.
-The atomic output writer admits the exact lock and generated partial filename through their source artifact IDs before creating either file or its parent directory. These declarations remain versioned, so effective ignore rules refuse them. The partial file is created exclusively only after admission and checked again before promotion. This check complements the concrete database, evidence and JSONL destination admission; it does not establish a successful live device recovery.
+need an explicit contract entry before use. Output entrypoints resolve the final file,
+its lock and its generated partial filename inside the companion `data/` directory
+before device access and again before promotion. The check is path-only: the data
+directory must exist, be named `data`, sit outside this source tree, and every path
+must stay inside it on ordinary single-link files (no `.git` component, link or
+reparse alias). No Git or GitHub call runs at write time; keeping DATA out of public
+repositories is enforced by the commit and push hooks. The partial file is created
+exclusively and checked again before promotion. None of this establishes a
+successful live device recovery.
 
-Read-only input resolution remains separate from output admission. Legacy
+Read-only inputs use the same path resolution. Legacy
 `qq_export` or `qq_organized` directories have no current producer or consumer here
 and need individual review before retention or removal.
 

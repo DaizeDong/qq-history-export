@@ -16,7 +16,7 @@ def diagnose(serial='', device=False, server_binary='frida-server'):
     checks = []
     def record(name, ready, detail):
         checks.append(dict(check=name, ready=bool(ready), detail=detail))
-    for executable in ('adb', 'git', 'gh'):
+    for executable in ('adb', 'git'):
         record(executable, shutil.which(executable) is not None, 'executable discovery')
     try:
         version = importlib.metadata.version('frida')
@@ -25,7 +25,7 @@ def diagnose(serial='', device=False, server_binary='frida-server'):
     record('frida-python', version.startswith('16.'), version)
     try:
         private_path('qq_export/doctor-probe')
-        record('private-storage', True, 'verified PRIVATE companion; no probe file written')
+        record('private-storage', True, 'companion data/ resolved outside the source tree; no probe file written')
     except (OSError, RuntimeError, ValueError) as exc:
         record('private-storage', False, str(exc))
     if device:

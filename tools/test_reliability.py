@@ -223,43 +223,11 @@ def test_unsupported_schema_and_live_journal_fail(database):
         inspect_database(database)
 
 
-@pytest.mark.parametrize('visibility', ['false', '', 'null'])
-def test_public_or_unknown_storage_is_rejected(tmp_path, monkeypatch, visibility):
-    import qq_storage as S
-    tool, repo, base = F.build_storage_fixture(tmp_path)
-    monkeypatch.setattr(S, 'ROOT', tool)
-    monkeypatch.setenv('QQ_HISTORY_EXPORT_DATA_DIR', str(base))
-    def run(argv):
-        if argv[0] == 'gh':
-            return visibility
-        if '--show-toplevel' in argv:
-            return str(repo)
-        if 'config' in argv:
-            return ''
-        if argv[-1] == 'remote':
-            return 'origin'
-        return 'https://github.com/example/synthetic-config.git'
-    monkeypatch.setattr(S, '_run', run)
-    with pytest.raises(RuntimeError, match='PUBLIC|unknown'):
-        S.private_path(base/'candidate.db')
-
-
 def test_private_storage_allows_named_companion_and_rejects_escape(tmp_path, monkeypatch):
     import qq_storage as S
     tool, repo, base = F.build_storage_fixture(tmp_path)
     monkeypatch.setattr(S, 'ROOT', tool)
     monkeypatch.setenv('QQ_HISTORY_EXPORT_DATA_DIR', str(base))
-    def run(argv):
-        if argv[0] == 'gh':
-            return 'true'
-        if '--show-toplevel' in argv:
-            return str(repo)
-        if 'config' in argv:
-            return ''
-        if argv[-1] == 'remote':
-            return 'origin'
-        return 'https://github.com/example/synthetic-config.git'
-    monkeypatch.setattr(S, '_run', run)
     assert S.private_path('candidate.db') == base/'candidate.db'
     with pytest.raises(RuntimeError):
         S.private_path(tmp_path/'escape.db')
@@ -288,17 +256,6 @@ def test_three_cli_stages_use_selected_private_root(database, tmp_path, monkeypa
     tool, repo, base = F.build_storage_fixture(tmp_path)
     monkeypatch.setattr(S, 'ROOT', tool)
     monkeypatch.setenv('QQ_HISTORY_EXPORT_DATA_DIR', str(base))
-    def storage_command(argv):
-        if argv[0] == 'gh':
-            return 'true'
-        if '--show-toplevel' in argv:
-            return str(repo)
-        if 'config' in argv:
-            return ''
-        if argv[-1] == 'remote':
-            return 'origin'
-        return 'https://github.com/example/synthetic-companion.git'
-    monkeypatch.setattr(S, '_run', storage_command)
     def fake_adb(serial, *args):
         command = ' '.join(args)
         if args[0] == 'pull':

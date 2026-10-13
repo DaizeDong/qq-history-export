@@ -140,7 +140,7 @@ def main():
     args = parser.parse_args()
     try:
         db = private_path(args.db)
-        output = private_path(args.out, artifact_id='recovery_evidence')
+        output = private_path(args.out)
         reject_input_alias(output, [db], database=db)
         bundle = recover_key(db, args.owner, args.host, args.pid, args.seconds)
         write_bundle(output, bundle)

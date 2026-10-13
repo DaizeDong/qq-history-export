@@ -20,7 +20,7 @@ has a distinct committed receipt, so the caller can inspect the artifact before 
 ## The archive has a private versioned home
 
 The source database and recovery bundle contain private chat data, including known plaintext.
-Writing commands verify a separate PRIVATE companion before acting. This creates a durable history
+Writing commands require an existing companion `data/` directory outside the tool repository before acting. This creates a durable history
 without an in-repository fallback that could publish a real export with the tool.
 The evidence bundle remains a local observation record, not an attestation signed by QQ.
 

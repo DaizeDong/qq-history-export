@@ -49,7 +49,7 @@ def _no_live_journal(serial, source):
 
 
 def pull_database(serial, uin, output):
-    output = private_path(output, artifact_id='database_candidates')
+    output = private_path(output)
     if output.exists():
         raise FileExistsError('output already exists; select a new candidate path')
     accounts = list_account_dbs(serial)
@@ -84,7 +84,7 @@ def pull_database(serial, uin, output):
                 raise RuntimeError(detail) from cleanup_error
         if failure is not None:
             raise failure
-        if output.exists() or private_path(output, artifact_id='database_candidates') != output:
+        if output.exists() or private_path(output) != output:
             raise RuntimeError('candidate destination changed; refusing overwrite')
     return dict(status='pulled_candidate', selected_owner=uin, owner_verified=False,
                 ownership_evidence='source_filename_only', database_sha256=before, output=str(output))

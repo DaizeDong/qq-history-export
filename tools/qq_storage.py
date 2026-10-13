@@ -1,74 +1,15 @@
-"""Resolve QQ runtime artifacts through the guard and verify PRIVATE storage."""
+"""Resolve QQ runtime artifacts inside the companion data/ directory (path-only checks)."""
 from contextlib import contextmanager
 import importlib.util
 import json
 import os
 from pathlib import Path
-import re
 import stat
-import subprocess
 import uuid
-from urllib.parse import urlsplit
 
 from qq_database import SIDECARS
 
 ROOT = Path(__file__).resolve().parents[1]
-
-
-_VISIBILITY_PREFIX = ['gh', 'api', '--hostname', 'github.com']
-_VISIBILITY_SUFFIX = ['--jq', '.private']
-
-
-def _run(argv):
-    env = {name: value for name, value in os.environ.items()
-           if name.upper() not in {'GIT_PAGER', 'GH_PAGER', 'PAGER'}}
-    _check_environment(env)
-    if (len(argv) == 7 and list(argv[:4]) == _VISIBILITY_PREFIX and list(argv[5:]) == _VISIBILITY_SUFFIX
-            and isinstance(argv[4], str) and argv[4].startswith('repos/')):
-        return _github_private(argv[4][len('repos/'):])
-    env.update(GIT_OPTIONAL_LOCKS='0', GIT_TERMINAL_PROMPT='0')
-    try:
-        p = subprocess.run(argv, capture_output=True, text=True, encoding='utf-8', timeout=20, env=env)
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        raise RuntimeError('Private storage verification unavailable: '+argv[0]) from exc
-    if p.returncode:
-        raise RuntimeError('Private storage verification failed: '+argv[0])
-    return p.stdout.strip()
-
-
-def _github_private(name):
-    """Live PRIVATE answer for OWNER/NAME, independent of the ACTIVE gh account.
-
-    A plain `gh api repos/OWNER/NAME` asks only with whichever account `gh auth switch` last
-    selected, so an active account that cannot see the companion failed every proof closed. The
-    pinned Guards kit asks with the owner's stored account, then every other stored account, then
-    gh's default, and refuses only when none can see it. Returns 'true' only for PRIVATE."""
-    module_path = ROOT/'guards/tools/data_boundary.py'
-    _physical_path(module_path)
-    if not module_path.is_file():
-        raise RuntimeError('Missing guards visibility query; initialize pinned submodules')
-    spec = importlib.util.spec_from_file_location('qq_guard_visibility_boundary', module_path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    ask = getattr(module, 'query_github_visibility', None)
-    if not callable(ask):
-        raise RuntimeError('Guards dependency lacks the account-independent visibility API')
-    try:
-        visibility = ask(name)
-    except module.GitError as exc:
-        raise RuntimeError('Private storage verification failed: no gh credential can see the companion') from exc
-    return 'true' if visibility == 'PRIVATE' else 'false'
-
-
-def _check_environment(environment=None):
-    """Allow inert hints; pagers are removed before captured subprocesses run."""
-    inert_git = {'GIT_INDEX_FILE', 'GIT_PREFIX', 'GIT_OPTIONAL_LOCKS', 'GIT_PAGER'}
-    for name in (os.environ if environment is None else environment):
-        upper = name.upper()
-        if ((upper.startswith('GIT_') and upper not in inert_git)
-                or upper in {'GH_HOST', 'GH_REPO', 'HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY',
-                             'SSL_CERT_FILE', 'SSL_CERT_DIR', 'CURL_CA_BUNDLE', 'CURL_SSL_BACKEND'}):
-            raise RuntimeError('Unsupported private-storage routing environment: '+name)
 
 
 def _physical_path(path):
@@ -96,77 +37,13 @@ def _check_data_aliases(path):
         _physical_path(Path(str(path)+suffix))
 
 
-def _configuration(directory):
-    raw = _run(['git', '-C', str(directory), 'config', '--includes', '--null', '--list'])
-    entries = []
-    requires_default_trust_proof = False
-    for record in raw.split('\0'):
-        if not record:
-            continue
-        key, separator, value = record.partition('\n')
-        if not separator or not key:
-            raise RuntimeError('Cannot parse private-storage Git configuration')
-        key = key.lower()
-        field = key.rsplit('.', 1)[-1]
-        standard_tls_backend = key == 'http.sslbackend' and value.strip().lower() in {'openssl', 'schannel'}
-        bundled_ca_candidate = key == 'http.sslcainfo'
-        if (key in {'core.worktree', 'core.sshcommand', 'core.gitproxy', 'ssh.variant'}
-                or key.startswith('http.') and not (standard_tls_backend or bundled_ca_candidate)
-                or key.startswith('remote.') and (field in {'uploadpack', 'receivepack', 'vcs'}
-                                                   or field.startswith('proxy'))):
-            raise RuntimeError('Unsupported private-storage Git routing configuration: '+key)
-        entries.append((key, value))
-        requires_default_trust_proof |= bundled_ca_candidate
-    if requires_default_trust_proof:
-        # Only Guards can establish that this is the selected Git installation's own CA bundle.
-        module_path = ROOT/'guards/tools/data_boundary.py'
-        _physical_path(module_path)
-        if not module_path.is_file():
-            raise RuntimeError('Missing guards default TLS trust proof; initialize pinned submodules')
-        spec = importlib.util.spec_from_file_location('qq_guard_tls_boundary', module_path)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        module.prove_private_companion(directory)
-    return entries
+def private_path(requested):
+    """Resolve a DATA path inside the companion data/ directory. Path-only: no Git or gh runs.
 
-
-def _https_identity(remote):
-    if any(character.isspace() or ord(character) < 32 for character in remote):
-        raise RuntimeError('Invalid companion publication URL')
-    parsed = urlsplit(remote)
-    if (parsed.scheme != 'https' or parsed.netloc.lower() != 'github.com'
-            or parsed.query or parsed.fragment):
-        raise RuntimeError('Unverified transport: configure canonical https://github.com/OWNER/REPO URLs; SSH is unsupported')
-    name = parsed.path.removeprefix('/').removesuffix('.git')
-    if not re.fullmatch(r'[A-Za-z0-9_-][A-Za-z0-9_.-]*/[A-Za-z0-9_-][A-Za-z0-9_.-]*', name):
-        raise RuntimeError('Invalid companion repository identity')
-    return name
-
-
-def _prove_publication(repo, configuration):
-    remotes = _run(['git', '-C', str(repo), 'remote']).splitlines()
-    if not remotes or len(remotes) != len(set(remotes)) or any(
-            not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]*', remote) for remote in remotes):
-        raise RuntimeError('Companion requires verifiable named publication remotes')
-    for key, value in configuration:
-        if key == 'remote.pushdefault' or key.startswith('branch.') and key.endswith(('.remote', '.pushremote')):
-            if value not in remotes:
-                raise RuntimeError('Selected publication remote is missing or unsupported')
-    identities = set()
-    for remote in remotes:
-        for mode in ([], ['--push']):
-            urls = _run(['git', '-C', str(repo), 'remote', 'get-url', *mode, '--all', remote]).splitlines()
-            if not urls:
-                raise RuntimeError('Publication destination is missing or unknown')
-            identities.update(_https_identity(url) for url in urls)
-    for name in sorted(identities):
-        if _run(['gh', 'api', '--hostname', 'github.com', 'repos/'+name, '--jq', '.private']) != 'true':
-            raise RuntimeError('Companion publication destination is PUBLIC or visibility is unknown')
-
-
-def private_path(requested, *, artifact_id=None):
-    """Resolve reads; output callers additionally bind the exact source artifact owner."""
-    _check_environment()
+    Keeping DATA out of public repositories is enforced at commit and push time by the hooks
+    and CI. Here the companion must already exist, the data directory must be named data/ and
+    sit outside this source tree, and the result must stay inside it on ordinary files.
+    """
     for selector in ('QQ_HISTORY_EXPORT_DATA_DIR', 'QQ_HISTORY_EXPORT_CONFIG', 'QQ_HISTORY_EXPORT_CONFIG_DIR'):
         value = os.environ.get(selector)
         if value:
@@ -184,39 +61,20 @@ def private_path(requested, *, artifact_id=None):
     spec.loader.exec_module(module)
     base = module.resolve_data_dir('qq-history-export')
     if base is None:
-        raise RuntimeError('Uninitialized: set QQ_HISTORY_EXPORT_CONFIG to a PRIVATE companion clone with data/')
+        raise RuntimeError('Uninitialized: set QQ_HISTORY_EXPORT_CONFIG to a private companion clone with data/')
     base = _physical_path(base).resolve()
     if not base.is_dir():
         raise RuntimeError('Resolved private data directory does not exist')
+    if base.name != 'data':
+        raise RuntimeError('Storage must use the companion data/ directory declared in storage.contract.json')
+    if base.is_relative_to(ROOT) or ROOT.is_relative_to(base):
+        raise RuntimeError('Output requires a companion outside this source repository')
     path = Path(requested).expanduser()
     path = path if path.is_absolute() else base/path
-    lexical = _physical_path(path)
-    path = lexical.resolve()
+    path = _physical_path(path).resolve()
     _check_data_aliases(path)
-    if not path.is_relative_to(base) or base.is_relative_to(ROOT) or ROOT.is_relative_to(base):
+    if not path.is_relative_to(base):
         raise RuntimeError('Output must stay inside the separate private data directory')
-    existing = path
-    while not existing.exists():
-        existing = existing.parent
-    if existing.is_file():
-        existing = existing.parent
-    configuration = _configuration(existing)
-    repo = _physical_path(_run(['git', '-C', str(existing), 'rev-parse', '--show-toplevel'])).resolve()
-    if not base.is_relative_to(repo) or repo.is_relative_to(ROOT) or ROOT.is_relative_to(repo):
-        raise RuntimeError('Output requires a separate versioned PRIVATE companion')
-    if base != repo/'data':
-        raise RuntimeError('Storage must use the companion data/ directory declared in storage.contract.json')
-    _prove_publication(repo, configuration)
-    if artifact_id is not None:
-        module_path = ROOT/'guards/tools/storage_contract.py'
-        _physical_path(module_path)
-        if not module_path.is_file():
-            raise RuntimeError('Missing source artifact admission; initialize pinned guards before writing')
-        spec = importlib.util.spec_from_file_location('qq_guard_storage_contract', module_path)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        path = module.authorize_artifact_write(
-            ROOT, repo, lexical.relative_to(repo).as_posix(), artifact_id=artifact_id).path
     return path
 
 
@@ -250,9 +108,8 @@ def atomic_output(path):
     """Exclusive writer with distinct uncommitted and committed cleanup failures."""
     path = Path(path)
     _check_data_aliases(path)
-    lock = private_path(path.with_name(path.name+'.lock'), artifact_id='transaction_locks')
-    temporary = private_path(path.with_name('.'+path.name+'-'+uuid.uuid4().hex+'.partial'),
-                             artifact_id='incomplete_outputs')
+    lock = private_path(path.with_name(path.name+'.lock'))
+    temporary = private_path(path.with_name('.'+path.name+'-'+uuid.uuid4().hex+'.partial'))
     path.parent.mkdir(parents=True, exist_ok=True)
     lock_stream = lock.open('x', encoding='utf-8')
     temporary_created = False
@@ -265,7 +122,7 @@ def atomic_output(path):
         temporary_created = True
         os.close(fd)
         yield temporary
-        private_path(temporary, artifact_id='incomplete_outputs')
+        private_path(temporary)
         _check_data_aliases(path)
         os.replace(temporary, path)
         committed = True
@@ -286,9 +143,9 @@ def atomic_output(path):
 
 
 def write_bundle(path, bundle):
-    path = private_path(path, artifact_id='recovery_evidence')
+    path = private_path(path)
     with atomic_output(path) as temporary:
         temporary.write_text(json.dumps(bundle, ensure_ascii=True, indent=2)+'\n', encoding='utf-8')
-        if private_path(path, artifact_id='recovery_evidence') != path:
+        if private_path(path) != path:
             raise ValueError('evidence destination changed before promotion')
     return path

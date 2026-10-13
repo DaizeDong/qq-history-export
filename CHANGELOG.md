@@ -4,6 +4,9 @@ All notable changes to this project are documented here (Keep a Changelog style)
 
 ## [Unreleased]
 
+### Removed
+- Runtime PRIVATE proof. `qq_storage.private_path()` no longer runs `git config`/`remote`/`rev-parse`, the `gh` visibility query, the Guards TLS trust proof or `storage_contract.authorize_artifact_write` admission, and the routing-environment refusal that only protected those calls is gone. Destinations are now checked by path only: an existing companion `data/` directory outside this source tree, results inside it, no `.git` component, link or multiply linked file. A missing companion still fails before device access with init guidance; no in-repo fallback. The `artifact_id` argument is removed from callers. `qq_doctor` no longer requires `gh`. Proof-only tests (`test_review_round3.py`, `test_visibility_any_gh_account.py`, route/TLS/admission cases) and their fixture generators are deleted; the remaining storage tests assert path-only behaviour. Commit and push gates are unchanged.
+
 ### Fixed
 - The live PRIVATE visibility check no longer depends on which gh account is active: it asks through the pinned guards kit's `query_github_visibility`, which tries the owner's stored account, every other stored account, then gh's default, and never switches the active account. Before, an active account that could not see the companion made every proof fail closed. Only PRIVATE is accepted.
 
