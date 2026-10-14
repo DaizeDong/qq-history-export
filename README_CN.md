@@ -83,17 +83,11 @@ python tools/qq_decode.py --db qq_db_pull/candidate.db --evidence qq_keys/recove
 账号验证、密钥证据状态、数据库哈希与解码覆盖率。附件及非文本消息不在范围内。
 
 证据包是本地观察记录，不是 QQ 签名证明。使用外来证据包前应确认来源。
-合成测试通过不代表真实账号历史完整，也不能证明任意客户端版本或设备都能成功恢复密钥。
+导出结果不代表真实账号历史完整，也不能证明任意客户端版本或设备都能成功恢复密钥。
 
-## 离线测试
+## 逆向说明
 
-```bash
-python -m pytest tools -q
-python tools/test_qq.py
-```
-
-测试数据库全部由 `tools/make_fixtures.py` 生成，设备和 Frida 调用均由测试替身接管。
-无需真实账号。[逆向说明](docs/REVERSE_ENGINEERING.md) 记录数据库结构与混淆模型。
+[逆向说明](docs/REVERSE_ENGINEERING.md) 记录数据库结构与混淆模型。
 
 ## Languages
 

@@ -85,6 +85,3 @@ Use matching Frida 16.x installations on both sides; other agent integrations ar
 The pulled database and every decoded message are real run output. They are private data and never
 enter this repository. The current tools resolve the pinned guard's data directory and refuse
 any destination outside it or inside this source tree. The recovery bundle also contains private observations.
-Tests run against a synthetic database produced by `tools/make_fixtures.py`, which
-encrypts fake messages with a synthetic key so the round trip can be checked without touching any
-real account.

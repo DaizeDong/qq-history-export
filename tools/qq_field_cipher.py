@@ -10,8 +10,7 @@ a fifteen byte key for the whole key, which decoded the first three Chinese char
 message and then diverged. detect_period_from_known_plaintext recovers the true key from one known
 plaintext, ciphertext pair. A separate independent pair must validate a recovered key.
 
-No real account data lives in this file. See tools/make_fixtures.py for how tests build a synthetic
-database that this module round trips.
+No real account data lives in this file.
 """
 
 

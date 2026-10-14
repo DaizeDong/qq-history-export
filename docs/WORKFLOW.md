@@ -73,6 +73,5 @@ versioned in the PRIVATE companion. Do not publish examples copied from a real r
 ## Evidence limits
 
 The CLI evidence is local and unsigned, not proof supplied by QQ. It cannot authenticate a bundle
-forged by someone who can modify both the database and evidence. Read-only synthetic tests cover
-reliability paths; real Android/QQ/Frida compatibility and archive completeness require their own
+forged by someone who can modify both the database and evidence. Real Android/QQ/Frida compatibility and archive completeness require their own
 measured evidence.

@@ -67,9 +67,3 @@ Return the private artifact path, counts, database hash, owner-verification stat
 coverage separately. State that only supported text rows were exported. A recovery bundle is
 an unsigned local observation record; forged or externally supplied bundles need provenance
 review. Do not claim whole-account completeness or universal device compatibility.
-
-## Offline tests
-
-Run `python -m pytest tools -q` and `python tools/test_qq.py` from the canonical repository root.
-Fixtures come from `tools/make_fixtures.py`; device/Frida regression calls are intercepted.
-Synthetic passing tests do not constitute a live-device export.
