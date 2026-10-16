@@ -34,8 +34,11 @@ SQLite 文件能打开，并不能证明消息字段解码正确。错误的短 
 ## 安装
 
 ```bash
-git clone --recurse-submodules https://github.com/DaizeDong/qq-history-export.git
+git clone https://github.com/DaizeDong/qq-history-export.git
+pip install -e "$(git config --get fleet.guards)"
 ```
+
+`git config fleet.guards` 指向本机 fleet-guards 检出：其中的 `fleet_guards` 包负责解析伴生仓；克隆后执行一次 `git config core.hooksPath .githooks`，提交和推送就会经它的钩子检查。
 
 从真实克隆位置加载 `skills/qq-history-export/SKILL.md`，以下命令在仓库根目录运行。
 

@@ -5,7 +5,8 @@ All notable changes to this project are documented here (Keep a Changelog style)
 ## [Unreleased]
 
 ### Removed
-- The test suite (`tools/test_*.py`), the fixture generator `tools/make_fixtures.py` and the `offline-tests` CI workflow. Commit, push and CI privacy gates are unchanged.
+- The `guards` and `style` submodules and the `pii-guard`, `dash-guard`, `doc-contract`, `load-budget` and `fleet-sync` workflows. The `.githooks` shims run the local fleet-guards and fleet-style checkouts named by `git config fleet.guards` and `fleet.style` and block when either is unset. `qq_storage` resolves the companion through `fleet_guards.runtime.companion_resolver` (`pip install -e "$(git config --get fleet.guards)"`).
+- The test suite (`tools/test_*.py`), the fixture generator `tools/make_fixtures.py` and the `offline-tests` CI workflow. Commit and push privacy gates are unchanged.
 - Runtime PRIVATE proof. `qq_storage.private_path()` no longer runs `git config`/`remote`/`rev-parse`, the `gh` visibility query, the Guards TLS trust proof or `storage_contract.authorize_artifact_write` admission, and the routing-environment refusal that only protected those calls is gone. Destinations are now checked by path only: an existing companion `data/` directory outside this source tree, results inside it, no `.git` component, link or multiply linked file. A missing companion still fails before device access with init guidance; no in-repo fallback. The `artifact_id` argument is removed from callers. `qq_doctor` no longer requires `gh`. Proof-only tests (`test_review_round3.py`, `test_visibility_any_gh_account.py`, route/TLS/admission cases) and their fixture generators are deleted; the remaining storage tests assert path-only behaviour. Commit and push gates are unchanged.
 
 ### Fixed

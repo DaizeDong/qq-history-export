@@ -34,8 +34,11 @@ Python 3.11 or newer is required. The device must provide `sha256sum`. A live SQ
 ## Install
 
 ```bash
-git clone --recurse-submodules https://github.com/DaizeDong/qq-history-export.git
+git clone https://github.com/DaizeDong/qq-history-export.git
+pip install -e "$(git config --get fleet.guards)"
 ```
+
+`git config fleet.guards` names the local fleet-guards checkout; its `fleet_guards` package resolves the companion and its hooks run through `.githooks` once a clone sets `git config core.hooksPath .githooks`.
 
 Load `skills/qq-history-export/SKILL.md` from the canonical clone. Run the commands below from its repository root.
 

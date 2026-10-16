@@ -1,7 +1,6 @@
 """Resolve QQ runtime artifacts inside the companion data/ directory (path-only checks)."""
 from contextlib import contextmanager
 from functools import lru_cache
-import importlib.util
 import json
 import os
 from pathlib import Path
@@ -42,15 +41,12 @@ _SELECTORS = ('QQ_HISTORY_EXPORT_DATA_DIR', 'QQ_HISTORY_EXPORT_CONFIG', 'QQ_HIST
 
 
 @lru_cache(maxsize=None)
-def _datadir_module(root):
-    module_path = root/'guards/tools/datadir.py'
-    _physical_path(module_path)
-    if not module_path.is_file():
-        raise RuntimeError('Missing guards; initialize pinned submodules before using runtime tools')
-    spec = importlib.util.spec_from_file_location('qq_guard_datadir', module_path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+def _resolver(root):
+    try:
+        from fleet_guards.runtime import companion_resolver
+    except ImportError as exc:
+        raise RuntimeError('fleet_guards is not installed; run: pip install -e "$(git config --get fleet.guards)"') from exc
+    return companion_resolver(source_root=root)
 
 
 @lru_cache(maxsize=None)
@@ -63,7 +59,7 @@ def _data_base(root, selection):
             if selector != 'QQ_HISTORY_EXPORT_DATA_DIR' and not _physical_path(Path(value)/'data').is_dir():
                 raise RuntimeError('Uninitialized: selected companion requires its declared data/ directory')
             break
-    base = _datadir_module(root).resolve_data_dir('qq-history-export')
+    base = _resolver(root).resolve_data_dir('qq-history-export')
     if base is None:
         raise RuntimeError('Uninitialized: set QQ_HISTORY_EXPORT_CONFIG to a private companion clone with data/')
     base = _physical_path(base).resolve()
@@ -79,8 +75,8 @@ def _data_base(root, selection):
 def private_path(requested):
     """Resolve a DATA path inside the companion data/ directory. Path-only: no Git or gh runs.
 
-    Keeping DATA out of public repositories is enforced at commit and push time by the hooks
-    and CI. Here the companion must already exist, the data directory must be named data/ and
+    Keeping DATA out of public repositories is enforced at commit and push time by the
+    .githooks shims. Here the companion must already exist, the data directory must be named data/ and
     sit outside this source tree, and the result must stay inside it on ordinary files. The
     data directory is resolved once per process for each selector configuration.
     """

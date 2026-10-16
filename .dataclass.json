@@ -3,7 +3,7 @@
     "TOOL is public code and documentation.",
     "FIXTURE: none. The repository ships no fixtures and no fixture generator.",
     "DATA is real runtime output in a separate PRIVATE versioned companion, never in this public repository.",
-    "The pinned guards enforce classification; qq_storage.py resolves through guards/tools/datadir.py and checks paths only; commit and push hooks keep DATA out of public repositories."
+    "The local fleet-guards checkout (git config fleet.guards) enforces classification at commit time; qq_storage.py resolves through fleet_guards.runtime.companion_resolver and checks paths only; commit and push hooks keep DATA out of public repositories."
   ],
   "_audited": "Pulls, recovery evidence, decoded output and output transaction files contain real runtime DATA. Every writing CLI resolves its destination inside the separate companion data/ directory before device access or writes; temporary files remain beside their private destination. A pull is explicitly an ownership-unverified candidate until key and account-field evidence passes. Decoder promotion is atomic. No raw or decoded archive can fall back into the public tool repository.",
   "data": [
