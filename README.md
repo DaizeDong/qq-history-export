@@ -46,7 +46,7 @@ Load `skills/qq-history-export/SKILL.md` from the canonical clone. Run the comma
 
 Select a separately cloned PRIVATE companion with an existing `data/` directory
 using `QQ_HISTORY_EXPORT_CONFIG`, or select that exact child with
-`QQ_HISTORY_EXPORT_DATA_DIR`. DATA_DIR takes precedence over CONFIG, then CONFIG_DIR;
+`QQ_HISTORY_EXPORT_DATA_DIR`. DATA_DIR takes precedence over CONFIG;
 shared discovery follows. Clear inherited DATA_DIR before switching CONFIG.
 Missing storage fails before device access or output creation. Installation needs
 no empty companion or settings registry.

@@ -37,7 +37,7 @@ def _check_data_aliases(path):
         _physical_path(Path(str(path)+suffix))
 
 
-_SELECTORS = ('QQ_HISTORY_EXPORT_DATA_DIR', 'QQ_HISTORY_EXPORT_CONFIG', 'QQ_HISTORY_EXPORT_CONFIG_DIR')
+_SELECTORS = ('QQ_HISTORY_EXPORT_DATA_DIR', 'QQ_HISTORY_EXPORT_CONFIG')
 
 
 @lru_cache(maxsize=None)

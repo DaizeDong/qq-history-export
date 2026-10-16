@@ -26,7 +26,7 @@ Load [reverse-engineering notes](../../docs/REVERSE_ENGINEERING.md) for schema o
   destinations outside that `data/` directory or inside the tool repository and has no
   tool-repository fallback. CONFIG requires
   an existing `data/` child. DATA_DIR must select that exact child; see [storage discovery](../../DATA.md)
-  for precedence, CONFIG_DIR and switching. Uninitialized storage stops before device access.
+  for precedence and switching. Uninitialized storage stops before device access.
 - Use only an already rooted device with the classic client. Do not install root, patch QQ,
   spawn through Frida or stop applications as part of diagnosis.
 - The bundled heap agent requires the Frida 16.x Java bridge on both sides. A missing bridge

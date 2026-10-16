@@ -8,7 +8,7 @@ and evidence validator remain authoritative for content and verification.
 
 Paths are relative to a separate PRIVATE companion root.
 Storage-only discovery uses `QQ_HISTORY_EXPORT_DATA_DIR` first, then
-`QQ_HISTORY_EXPORT_CONFIG`, then its `QQ_HISTORY_EXPORT_CONFIG_DIR` alias, followed by
+`QQ_HISTORY_EXPORT_CONFIG`, followed by
 fleet-guards companion discovery (`fleet_guards.runtime.companion_resolver`) for proven siblings (there is no
 home-directory default). All accepted layouts
 must resolve to the companion root plus `data/`. A selected CONFIG without that child

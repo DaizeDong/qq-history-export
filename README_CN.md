@@ -46,7 +46,7 @@ pip install -e "$(git config --get fleet.guards)"
 
 将 `QQ_HISTORY_EXPORT_CONFIG` 指向已有 `data/` 的独立 PRIVATE 伴生仓，或用
 `QQ_HISTORY_EXPORT_DATA_DIR` 直接指定该子目录。DATA_DIR 优先于 CONFIG，随后是
-CONFIG_DIR 和共享发现规则；切换 CONFIG 前须清除继承的 DATA_DIR。
+共享发现规则；切换 CONFIG 前须清除继承的 DATA_DIR。
 存储未初始化时在设备访问或输出创建前失败。安装不要求空伴生仓或设置注册表。
 
 [DATA.md](DATA.md) 规定完整发现顺序和保留规则。最终输出及其锁文件、临时文件在创建和
