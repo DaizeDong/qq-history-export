@@ -52,13 +52,6 @@ def _resolver(root):
 @lru_cache(maxsize=None)
 def _data_base(root, selection):
     """The companion data/ directory, resolved and checked once per tool root and selector values."""
-    for selector, value in zip(_SELECTORS, selection):
-        if value:
-            if not _physical_path(value).is_dir():
-                raise RuntimeError('Explicit private storage selector does not exist: '+selector)
-            if selector != 'QQ_HISTORY_EXPORT_DATA_DIR' and not _physical_path(Path(value)/'data').is_dir():
-                raise RuntimeError('Uninitialized: selected companion requires its declared data/ directory')
-            break
     base = _resolver(root).resolve_data_dir('qq-history-export')
     if base is None:
         raise RuntimeError('Uninitialized: set QQ_HISTORY_EXPORT_CONFIG to a private companion clone with data/')
